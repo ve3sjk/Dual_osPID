@@ -1,5 +1,14 @@
 #include <EEPROM.h>
 #include <Wire.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <UTFT.h>
+#include <UTFT_DLB.h>
+#include <UTouch.h>
+#include <UTFT_Buttons.h>
+#include <UTFT_DLB_Buttons.h>
+
+
 #include "MAX31855_local.h"
 #include "PID_v1_local.h"
 #include "EEPROMAnything.h"
@@ -10,19 +19,59 @@
 
 const byte buzzerPin = 11;
 const byte systemLEDPin = 13;
-const byte thermocoupleCS = 8;
-const byte thermocoupleCS2 = 6;
-const byte thermocoupleSO = 12;
-const byte thermocoupleCLK = 4;
-const byte SSRPin = 9;
-const byte SSRPin2 = 10;
-const unsigned char i2cAddress = 0x4C;  // LCD module I2C address
+//const byte thermocoupleCS = 5;
+//const byte thermocoupleCS2 = 6;
+//const byte thermocoupleSO = 12;
+//const byte thermocoupleCLK = 4;
+const byte SSRPin = 10;
+const byte SSRPin2 = 9;
+const byte oneWireBus =8;
 
+const unsigned char i2cAddress = 0x4C;  // LCD module I2C address
+char buffer2 [8];
 const byte EEPROM_ID = 2; //used to automatically trigger and eeprom reset after firmware update (if necessary)
 
-MAX31855 thermocouple(thermocoupleSO, thermocoupleCS, thermocoupleCLK);
-MAX31855 thermocouple2(thermocoupleSO, thermocoupleCS2, thermocoupleCLK);
+//added digital probe init code here
+
+OneWire oneWire(oneWireBus);
+DallasTemperature sensors(&oneWire);
+
+DeviceAddress tempSensor1 = {0x28, 0xFF, 0xBF, 0x86, 0x71, 0x15, 0x01, 0xB1 }; //Sensor 1
+DeviceAddress tempSensor2 = {0x28, 0xFF, 0xF9, 0x1E, 0x71, 0x15, 0x02, 0xDB }; //Sensor 2
+DeviceAddress tempSensor3 = {0x28, 0xFF, 0x6F, 0x28, 0x71, 0x15, 0x02, 0xB1 }; //Sensor 3
+DeviceAddress tempSensor4 = {0x28, 0x95, 0x54, 0xEB, 0x03, 0x00, 0x00, 0xF7 }; //Sensor 4
+DeviceAddress tempSensor5 = {0x28, 0x23, 0x50, 0xEB, 0x03, 0x00, 0x00, 0x5D }; //Sensor 5
+DeviceAddress tempSensor6 = {0x28, 0xAB, 0x79, 0x51, 0x03, 0x00, 0x00, 0x97 }; //Sensor 6
+
+float tempcheckSensor1;
+float tempcheckSensor2;
+float tempcheckSensor3;
+float tempcheckSensor4;
+float tempcheckSensor5;
+float tempcheckSensor6;
+
+
+//MAX31855 thermocouple(thermocoupleSO, thermocoupleCS, thermocoupleCLK);
+//MAX31855 thermocouple2(thermocoupleSO, thermocoupleCS2, thermocoupleCLK);
 LCDI2Cw lcd(16, 2, i2cAddress);
+
+//**********************added touch screen init
+
+extern uint8_t SmallFont[];
+extern uint8_t BigFont[];
+extern uint8_t Dingbats1_XL[];
+extern uint8_t SevenSegNumFont[];
+extern uint8_t DejaVuSans18[];
+extern uint8_t DejaVuSans24[];
+
+
+
+UTFT_DLB      myGLCD(SSD1963_800ALT,38,39,40,41);
+//UTFT_SPIflash myFiles(&myGLCD, &myFlash);
+UTouch        myTouch(6,5,4,3,2);
+UTFT_DLB_Buttons myButtons(&myGLCD, &myTouch);
+
+
 
 unsigned long now, buttonTime, ioTime, serialTime;
 boolean sendInfo=true, sendDash=true, sendTune=true, sendAtune=true;
@@ -35,11 +84,11 @@ bool tuning2= false;
 double error, error2;
 int val, val2;
 
-double setpoint=250, input=250, output=50, pidInput=250;
-double setpoint2=250, input2=250, output2=50, pidInput2=250;
+double setpoint=20, input=80, output=0, pidInput=80;
+double setpoint2=20, input2=80, output2=0, pidInput2=80;
 
-double kp = 2, ki = 0.5, kd = 2;
-double kp2 = 2, ki2 = 0.5, kd2 = 2;
+double kp = 10, ki = 0, kd = 0;
+double kp2 = 10, ki2 = 0, kd2 = 0;
 byte ctrlDirection = 0;
 byte ctrlDirection2 = 0;
 byte modeIndex = 1;
@@ -93,22 +142,37 @@ boolean runningProfile2 = false;
 void setup()
 {
   TCCR1B = TCCR1B & 0b11111000 | 0x05;
-  Serial.begin(9600);
+  Serial.begin(115200);
   buttonTime=1;
   ioTime=5;
   serialTime=6;
+  
   //windowStartTime=2;
-  lcd.begin();
-  lcd.keypadMode(1);
-  lcd.backlight(250);
-  lcd.contrast(20);
-
-  lcd.setCursor(0,0);
-  lcd.print(F(" Dual osPID   "));
-  lcd.setCursor(0,1);
-  lcd.print(F(" v1.00   "));
+//  lcd.begin();
+//  lcd.keypadMode(1);
+//  lcd.backlight(250);
+//  lcd.contrast(20);
+//
+//  lcd.setCursor(0,0);
+//  lcd.print(F(" Dual osPID   "));
+//  lcd.setCursor(0,1);
+//  lcd.print(F(" v1.00   "));
+//  delay(1000);
+//*****************************************************
+  myGLCD.InitLCD();
+  myGLCD.clrScr();
+  myGLCD.setColor(255, 120, 120);
+  myGLCD.setBackColor(0, 0, 0);
+  myGLCD.setFont(DejaVuSans18);
+  Serial.println(" Dual osPID   ");
+  Serial.println(" v1.00   ");
+  myButtons.setTextFont(DejaVuSans18);
+  
+  myTouch.InitTouch();
+  myTouch.setPrecision(PREC_MEDIUM);
+//*****************************************************  
+  
   delay(1000);
-
   initializeEEPROM();
 
   InitializeOutputCard();
@@ -124,7 +188,7 @@ void setup()
   myPID2.SetMode(modeIndex2);
 
 }
-
+//***************************loop start*****************
 byte editDepth=0;
 void loop()
 {
@@ -135,11 +199,13 @@ void loop()
   if(doIO)
   { 
     ioTime+=250;
-    ReadInput();
-    ReadInput2();
-    if(!isnan(input))pidInput = input;
-    if(!isnan(input2))pidInput2 = input2;
-
+    //ReadInput();
+    //ReadInput2();
+    ReadDallas();
+    //if(!isnan(input))pidInput = input;
+    //if(!isnan(input2))pidInput2 = input2;
+    pidInput = input;
+    pidInput2 = input2;
   }
   
   bool doButton = now >= buttonTime;
@@ -267,38 +333,93 @@ void loop()
 
 void drawLCD()
 {
-  lcd.noCursor();
-  lcd.home();
-  lcd.print("A");
-  lcd.print(input);
-  lcd.print("  B");
-  lcd.print(input2);
-  lcd.setCursor(1,0);
-  lcd.print(" ");
-  lcd.print(setpoint);
-  lcd.print("   ");
-  lcd.print(setpoint2);
+  
+//  lcd.noCursor();
+//  lcd.home();
+//  lcd.print("A");
+//  lcd.print(input);
+//  lcd.print("  B");
+//  lcd.print(input2);
+//  lcd.setCursor(1,0);
+//  lcd.print(" ");
+//  lcd.print(setpoint);
+//  lcd.print("   ");
+//  lcd.print(setpoint2);
+  
+
+  myGLCD.clrScr();
+  
+  myGLCD.print("Input",90,20);
+  dtostrf (input,5,2,buffer2);
+  myGLCD.print(buffer2,85,50);
+  myGLCD.print("PID",40,20);
+  dtostrf (input2,5,2,buffer2);
+  myGLCD.print(buffer2,80,80);
+  myGLCD.print("Setpoint",150,20);
+  dtostrf (setpoint,5,2,buffer2);
+  myGLCD.print(buffer2,150,50);
+  myGLCD.print("001",40,50);
+  myGLCD.print("002",40,80);
+  dtostrf (setpoint2,5,2,buffer2);
+  myGLCD.print(buffer2,150,80);
+  
 }
 
-void ReadInput()
+void ReadDallas()
 {
-   double input = thermocouple.readThermocouple(CELSIUS);
-   if (input==FAULT_OPEN || input==FAULT_SHORT_GND || input==FAULT_SHORT_VCC)
-   {
-     error = input;
-     input = NAN;
-   }
-}
+    sensors.requestTemperatures();
+    tempcheckSensor1= sensors.getTempF(tempSensor1);
+    tempcheckSensor2= sensors.getTempF(tempSensor2);
+    tempcheckSensor3= sensors.getTempF(tempSensor3);
+    tempcheckSensor4= sensors.getTempF(tempSensor4);
+    tempcheckSensor5= sensors.getTempF(tempSensor5);
+    tempcheckSensor6= sensors.getTempF(tempSensor6);
+//    sensors.requestTemperatures();
+//    tempcheckSensor1= tempcheckSensor1 + sensors.getTempF(tempSensor1);
+//    tempcheckSensor2= tempcheckSensor2 + sensors.getTempF(tempSensor2);
+//    tempcheckSensor3= tempcheckSensor3 + sensors.getTempF(tempSensor3);
+//    tempcheckSensor4= tempcheckSensor4 + sensors.getTempF(tempSensor4);
+//    tempcheckSensor5= tempcheckSensor5 + sensors.getTempF(tempSensor5);
+//    tempcheckSensor6= tempcheckSensor6 + sensors.getTempF(tempSensor6);
+//    sensors.requestTemperatures();
+//    tempcheckSensor1= tempcheckSensor1 + sensors.getTempF(tempSensor1);
+//    tempcheckSensor2= tempcheckSensor2 + sensors.getTempF(tempSensor2);
+//    tempcheckSensor3= tempcheckSensor3 + sensors.getTempF(tempSensor3);
+//    tempcheckSensor4= tempcheckSensor4 + sensors.getTempF(tempSensor4);
+//    tempcheckSensor5= tempcheckSensor5 + sensors.getTempF(tempSensor5);
+//    tempcheckSensor6= tempcheckSensor6 + sensors.getTempF(tempSensor6);
+//    
+//    tempcheckSensor1= tempcheckSensor1/3;
+//    tempcheckSensor2= tempcheckSensor2/3;
+//    tempcheckSensor3= tempcheckSensor3/3;
+//    tempcheckSensor4= tempcheckSensor4/3;
+//    tempcheckSensor5= tempcheckSensor5/3;
+//    tempcheckSensor6= tempcheckSensor6/3;
 
-void ReadInput2()
-{
-   double input2 = thermocouple2.readThermocouple(CELSIUS);
-   if (input2==FAULT_OPEN || input2==FAULT_SHORT_GND || input2==FAULT_SHORT_VCC)
-   {
-     error2 = input;
-     input2 = NAN;
-   }
-}
+      input = tempcheckSensor4;
+      input2 = tempcheckSensor5;
+
+}   
+
+//void ReadInput()
+//{
+//   double input = thermocouple.readThermocouple(CELSIUS);
+//   if (input==FAULT_OPEN || input==FAULT_SHORT_GND || input==FAULT_SHORT_VCC)
+//   {
+//     error = input;
+//     input = NAN;
+//   }
+//}
+
+//void ReadInput2()
+//{
+//   double input2 = thermocouple2.readThermocouple(CELSIUS);
+//   if (input2==FAULT_OPEN || input2==FAULT_SHORT_GND || input2==FAULT_SHORT_VCC)
+//   {
+//     error2 = input;
+//     input2 = NAN;
+//   }
+//}
 
 void InitializeOutputCard()
 {
@@ -1038,6 +1159,18 @@ void SerialSend()
     Serial.print(myPID.GetMode());
     Serial.print(" ");
     Serial.print(myPID2.GetMode());
+    Serial.print(" ");
+    Serial.print(tempcheckSensor1);
+    Serial.print(" ");
+    Serial.print(tempcheckSensor2);
+    Serial.print(" ");
+    Serial.print(tempcheckSensor3);
+    Serial.print(" ");
+    Serial.print(tempcheckSensor4);
+    Serial.print(" ");
+    Serial.print(tempcheckSensor5);
+    Serial.print(" ");
+    Serial.print(tempcheckSensor6);
     Serial.print(" ");
     Serial.println(ackDash?1:0);
     if(sendDash)sendDash=false;
