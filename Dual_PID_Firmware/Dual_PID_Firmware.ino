@@ -23,11 +23,11 @@ const byte systemLEDPin = 13;
 //const byte thermocoupleCS2 = 6;
 //const byte thermocoupleSO = 12;
 //const byte thermocoupleCLK = 4;
-const byte SSRPin = 10;
-const byte SSRPin2 = 9;
+const byte pid1_SSRPin = 10;
+const byte pid2_SSRPin = 9;
 const byte oneWireBus =8;
 
-const unsigned char i2cAddress = 0x4C;  // LCD module I2C address
+//const unsigned char i2cAddress = 0x4C;  // LCD module I2C address
 char buffer2 [8];
 const byte EEPROM_ID = 2; //used to automatically trigger and eeprom reset after firmware update (if necessary)
 
@@ -53,7 +53,7 @@ float tempcheckSensor6;
 
 //MAX31855 thermocouple(thermocoupleSO, thermocoupleCS, thermocoupleCLK);
 //MAX31855 thermocouple2(thermocoupleSO, thermocoupleCS2, thermocoupleCLK);
-LCDI2Cw lcd(16, 2, i2cAddress);
+//LCDI2Cw lcd(16, 2, i2cAddress);
 
 //**********************added touch screen init
 
@@ -73,92 +73,87 @@ UTFT_DLB_Buttons myButtons(&myGLCD, &myTouch);
 
 
 
-unsigned long now, buttonTime, ioTime, serialTime;
+unsigned long now, tft_Time, buttonTime, ioTime, serialTime;
 boolean sendInfo=true, sendDash=true, sendTune=true, sendAtune=true;
 
 bool editing=false;
 
-bool tuning = false;
-bool tuning2= false;
+bool pid1_tuning = false;
+bool pid2_tuning= false;
 
-double error, error2;
-int val, val2;
+double pid1_error, pid2_error;
+int pid1_Val, pid2_Val;
 
-double setpoint=20, input=80, output=0, pidInput=80;
-double setpoint2=20, input2=80, output2=0, pidInput2=80;
+double pid1_setpoint=200, pid1_input=80, pid1_output=255, pid1_pidInput=80;
+double pid2_setpoint=100, pid2_input=30, pid2_output=255, pid2_pidInput=30;
 
-double kp = 10, ki = 0, kd = 0;
-double kp2 = 10, ki2 = 0, kd2 = 0;
-byte ctrlDirection = 0;
-byte ctrlDirection2 = 0;
-byte modeIndex = 1;
-byte modeIndex2 = 1;
+double pid1_kp = 10.0, pid1_ki = 0.0, pid1_kd = 0.0;
+double pid2_kp = 20.0, pid2_ki = 20.0, pid2_kd = 20.0;
+
+byte pid1_ctrlDirection = 1;
+byte pid2_ctrlDirection = 1;
+byte pid1_modeIndex = 1;
+byte pid2_modeIndex = 1;
 byte databyte;
 
-PID myPID(&pidInput, &output, &setpoint,kp,ki,kd, DIRECT);
-PID myPID2(&pidInput2, &output2, &setpoint2,kp2,ki2,kd2, DIRECT);
+PID myPID1(&pid1_pidInput, &pid1_output, &pid1_setpoint,pid1_kp,pid1_ki,pid1_kd, DIRECT);
+PID myPID2(&pid2_pidInput, &pid2_output, &pid2_setpoint,pid2_kp,pid2_ki,pid2_kd, DIRECT);
 
-double aTuneStep = 20, aTuneNoise = 1;
-double aTuneStep2 = 20, aTuneNoise2 = 1;
-unsigned int aTuneLookBack = 10;
-unsigned int aTuneLookBack2 = 10;
-byte ATuneModeRemember = 0;
-byte ATuneModeRemember2 = 0;
-PID_ATune aTune(&pidInput, &output);
-PID_ATune aTune2(&pidInput2, &output2);
+double pid1_aTuneStep = 20.0, pid1_aTuneNoise = 1.0;
+double pid2_aTuneStep = 50.0, pid2_aTuneNoise = 2.0;
+unsigned int pid1_aTuneLookBack = 10.0;
+unsigned int pid2_aTuneLookBack = 30.0;
+byte pid1_ATuneModeRember = 0;
+byte pid2_ATuneModeRember = 0;
+PID_ATune pid1_aTune(&pid1_pidInput, &pid1_output);
+PID_ATune pid2_aTune(&pid2_pidInput, &pid2_output);
 
 
-byte curProfStep=0;
-byte curProfStep2=0;
-byte curType=0;
-byte curType2=0;
-float curVal=0;
-float curVal2=0;
-float helperVal=0;
-float helperVal2=0;
-unsigned long helperTime=0;
-unsigned long helperTime2=0;
-boolean helperflag=false;
-boolean helperflag2=false;
-unsigned long curTime=0;
-unsigned long curTime2=0;
+byte pid1_curProfStep=0;
+byte pid2_curProfStep=0;
+byte pid1_curType=0;
+byte pid2_curType=0;
+float pid1_curVal=0;
+float pid2_curVal=0;
+float pid1_helperVal=0;
+float pid2_helperVal=0;
+unsigned long pid1_helperTime=0;
+unsigned long pid2_helperTime=0;
+boolean pid1_helperFlag=false;
+boolean pid2_helperFlag=false;
+unsigned long pid1_curTime=0;
+unsigned long pid2_curTime=0;
 
 /*Profile declarations*/
-const unsigned long profReceiveTimeout = 10000;
-unsigned long profReceiveStart=0;
-boolean receivingProfile=false;
-const int nProfSteps = 15;
-const int nProfSteps2 = 15;
-byte proftypes[nProfSteps];
-byte proftypes2[nProfSteps2];
-unsigned long proftimes[nProfSteps];
-unsigned long proftimes2[nProfSteps2];
-float profvals[nProfSteps];
-float profvals2[nProfSteps2];
-boolean runningProfile = false;
-boolean runningProfile2 = false;
+const unsigned long pid1_profReceiveTimeout = 10000;
+const unsigned long pid2_profReceiveTimeout = 10000;
+unsigned long pid1_profReceiveStart=0;
+unsigned long pid2_profReceiveStart=0;
+boolean pid1_receivingProfile=false;
+boolean pid2_receivingProfile=false;
+const int pid1_nProfSteps = 15;
+const int pid2_nProfSteps = 15;
+byte pid1_profTypes[pid1_nProfSteps];
+byte pid2_profTypes[pid2_nProfSteps];
+unsigned long pid1_profTimes[pid1_nProfSteps];
+unsigned long pid2_profTimes[pid2_nProfSteps];
+float pid1_profVals[pid1_nProfSteps];
+float pid2_profVals[pid2_nProfSteps];
+boolean pid1_runningProfile = false;
+boolean pid2_runningProfile = false;
 
 
 void setup()
 {
   TCCR1B = TCCR1B & 0b11111000 | 0x05;
   Serial.begin(115200);
-  buttonTime=1;
+//  buttonTime=1;
   ioTime=5;
   serialTime=6;
+  tft_Time=10;
   
   //windowStartTime=2;
-//  lcd.begin();
-//  lcd.keypadMode(1);
-//  lcd.backlight(250);
-//  lcd.contrast(20);
-//
-//  lcd.setCursor(0,0);
-//  lcd.print(F(" Dual osPID   "));
-//  lcd.setCursor(0,1);
-//  lcd.print(F(" v1.00   "));
-//  delay(1000);
-//*****************************************************
+
   myGLCD.InitLCD();
   myGLCD.clrScr();
   myGLCD.setColor(255, 120, 120);
@@ -167,25 +162,26 @@ void setup()
   Serial.println(" Dual osPID   ");
   Serial.println(" v1.00   ");
   myButtons.setTextFont(DejaVuSans18);
-  
   myTouch.InitTouch();
   myTouch.setPrecision(PREC_MEDIUM);
-//*****************************************************  
-  
-  delay(1000);
+
+//  delay(1000);
+
   initializeEEPROM();
 
   InitializeOutputCard();
-  myPID.SetSampleTime(1000);
-  myPID.SetOutputLimits(0, 255);
-  myPID.SetTunings(kp, ki, kd);
-  myPID.SetControllerDirection(ctrlDirection);
-  myPID.SetMode(modeIndex);
+  
+  myPID1.SetSampleTime(1000);
+  myPID1.SetOutputLimits(0, 255);
+  myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
+  myPID1.SetControllerDirection(pid1_ctrlDirection);
+  myPID1.SetMode(pid1_modeIndex);
+  
   myPID2.SetSampleTime(1000);
   myPID2.SetOutputLimits(0, 255);
-  myPID2.SetTunings(kp, ki, kd);
-  myPID2.SetControllerDirection(ctrlDirection2);
-  myPID2.SetMode(modeIndex2);
+  myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
+  myPID2.SetControllerDirection(pid2_ctrlDirection);
+  myPID2.SetMode(pid2_modeIndex);
 
 }
 //***************************loop start*****************
@@ -202,165 +198,116 @@ void loop()
     //ReadInput();
     //ReadInput2();
     ReadDallas();
-    //if(!isnan(input))pidInput = input;
-    //if(!isnan(input2))pidInput2 = input2;
-    pidInput = input;
-    pidInput2 = input2;
+    //if(!isnan(pid1_input))pid1_pidInput = pid1_input;
+    //if(!isnan(pid2_input))pid2_pidInput = pid2_input;
+    pid1_pidInput = pid1_input;
+    pid2_pidInput = pid2_input;
   }
   
-  bool doButton = now >= buttonTime;
-  
-  if(doButton)  //read the button states
-  {
-    int dataByte = lcd.keypad();
-    switch (databyte)
-    {
-      case 1:
-        setpoint++;
-        break;
-      case 2:
-        setpoint--;
-        break;
-      case 3:
-        changeAutoTune();
-        break;
-      case 4:
-        setpoint2++;
-        break;
-      case 5:
-        setpoint2--;
-        break;
-      case 6:
-        changeAutoTune2();
-        break;
-      case 7:
-        if (!runningProfile)
-        {
-          StartProfile();
-        }
-        else
-        {
-          StopProfile();
-        }
-        break;
-      case 8:
-        if (!runningProfile2)
-        {
-          StartProfile2();
-        }
-        else
-        {
-          StopProfile2();
-        }
-        break;
-      default:
-        break;
-    }
-    buttonTime += 20;
-  }
+  Serial.println("done input/output");
 
-  if(tuning)
+  if(pid1_tuning)
   {
-    byte val = (aTune.Runtime());
+    byte pid1_Val = (pid1_aTune.Runtime());
 
-    if(val != 0)
+    if(pid1_Val != 0)
     {
-      tuning = false;
+      pid1_tuning = false;
     }
 
-    if(!tuning)
+    if(!pid1_tuning)
     { 
-      // We're done, set the tuning parameters
-      kp = aTune.GetKp();
-      ki = aTune.GetKi();
-      kd = aTune.GetKd();
-      myPID.SetTunings(kp, ki, kd);
-      AutoTuneHelper(false);
+      // We're done, set the pid1_tuning parameters
+      pid1_kp = pid1_aTune.GetKp();
+      pid1_ki = pid1_aTune.GetKi();
+      pid1_kd = pid1_aTune.GetKd();
+      myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
+      pid1_AutoTuneHelper(false);
       EEPROMBackupTunings();
     }
   }
   else
   {
-    if(runningProfile) ProfileRunTime();
+    if(pid1_runningProfile) pid1_ProfileRunTime();
     //allow the pid to compute if necessary
-    myPID.Compute();
+    myPID1.Compute();
   }
 
-  if(tuning2)
+  Serial.println("done pid1 tuning check");
+  
+  if(pid2_tuning)
   {
-    byte val = (aTune2.Runtime());
+    byte pid2_Val = (pid2_aTune.Runtime());
 
-    if(val != 0)
+    if(pid2_Val != 0)
     {
-      tuning2 = false;
+      pid2_tuning = false;
     }
 
-    if(!tuning2)
+    if(!pid2_tuning)
     { 
       // We're done, set the tuning parameters
-      kp2 = aTune2.GetKp();
-      ki2 = aTune2.GetKi();
-      kd2 = aTune2.GetKd();
-      myPID2.SetTunings(kp2, ki2, kd2);
-      AutoTuneHelper2(false);
+      pid2_kp = pid2_aTune.GetKp();
+      pid2_ki = pid2_aTune.GetKi();
+      pid2_kd = pid2_aTune.GetKd();
+      myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
+      pid2_AutoTuneHelper(false);
       EEPROMBackupTunings();
     }
   }
   else
   {
-    if(runningProfile) ProfileRunTime();
+    if(pid2_runningProfile) pid2_ProfileRunTime();
     //allow the pid to compute if necessary
     myPID2.Compute();
   }
-
-  drawLCD();
-
+  Serial.println("done pid2 tuning check");
   if(doIO)
   {
     //send to output card
-    WriteToOutput();
-    WriteToOutput2();
+    pid1_WriteToOutput();
+    pid2_WriteToOutput();
   }
-
+  
+  Serial.println("done send output");
+  
+  if(now>tft_Time)
+  {
+  drawTFT();
+  tft_Time+=250;
+  }
+  Serial.println("done tft");
+  
   if(millis() > serialTime)
   {
-    //if(receivingProfile && (now-profReceiveStart)>profReceiveTimeout) receivingProfile = false;
+//    if(pid1_receivingProfile && (now-pid1_profReceiveStart)>pid1_profReceiveTimeout) pid1_receivingProfile = false;
+//    Serial.println("pid1prof");
+//    if(pid2_receivingProfile && (now-pid2_profReceiveStart)>pid2_profReceiveTimeout) pid2_receivingProfile = false;
+//    Serial.println("pid2prof");
     SerialReceive();
+    Serial.println("done serial recv");
     SerialSend();
+    Serial.println("done serial send");
     serialTime += 500;
   }
 }
 
-void drawLCD()
+void drawTFT()
 {
-  
-//  lcd.noCursor();
-//  lcd.home();
-//  lcd.print("A");
-//  lcd.print(input);
-//  lcd.print("  B");
-//  lcd.print(input2);
-//  lcd.setCursor(1,0);
-//  lcd.print(" ");
-//  lcd.print(setpoint);
-//  lcd.print("   ");
-//  lcd.print(setpoint2);
-  
-
   myGLCD.clrScr();
   
   myGLCD.print("Input",90,20);
-  dtostrf (input,5,2,buffer2);
+  dtostrf (pid1_input,5,2,buffer2);
   myGLCD.print(buffer2,85,50);
   myGLCD.print("PID",40,20);
-  dtostrf (input2,5,2,buffer2);
+  dtostrf (pid2_input,5,2,buffer2);
   myGLCD.print(buffer2,80,80);
   myGLCD.print("Setpoint",150,20);
-  dtostrf (setpoint,5,2,buffer2);
+  dtostrf (pid1_setpoint,5,2,buffer2);
   myGLCD.print(buffer2,150,50);
   myGLCD.print("001",40,50);
   myGLCD.print("002",40,80);
-  dtostrf (setpoint2,5,2,buffer2);
+  dtostrf (pid2_setpoint,5,2,buffer2);
   myGLCD.print(buffer2,150,80);
   
 }
@@ -396,403 +343,403 @@ void ReadDallas()
 //    tempcheckSensor5= tempcheckSensor5/3;
 //    tempcheckSensor6= tempcheckSensor6/3;
 
-      input = tempcheckSensor4;
-      input2 = tempcheckSensor5;
+      pid1_input = tempcheckSensor4;
+      pid2_input = tempcheckSensor5;
 
 }   
 
 //void ReadInput()
 //{
-//   double input = thermocouple.readThermocouple(CELSIUS);
-//   if (input==FAULT_OPEN || input==FAULT_SHORT_GND || input==FAULT_SHORT_VCC)
+//   double pid1_input = thermocouple.readThermocouple(CELSIUS);
+//   if (pid1_input==FAULT_OPEN || pid1_input==FAULT_SHORT_GND || pid1_input==FAULT_SHORT_VCC)
 //   {
-//     error = input;
-//     input = NAN;
+//     pid1_error = pid1_input;
+//     pid1_input = NAN;
 //   }
 //}
 
 //void ReadInput2()
 //{
-//   double input2 = thermocouple2.readThermocouple(CELSIUS);
-//   if (input2==FAULT_OPEN || input2==FAULT_SHORT_GND || input2==FAULT_SHORT_VCC)
+//   double pid2_input = thermocouple2.readThermocouple(CELSIUS);
+//   if (pid2_input==FAULT_OPEN || pid2_input==FAULT_SHORT_GND || pid2_input==FAULT_SHORT_VCC)
 //   {
-//     error2 = input;
-//     input2 = NAN;
+//     pid2_error = pid2_input;
+//     pid2_input = NAN;
 //   }
 //}
 
 void InitializeOutputCard()
 {
-  analogWrite(SSRPin, 0);
-  analogWrite(SSRPin2, 0);
+  analogWrite(pid1_SSRPin, 0);
+  analogWrite(pid2_SSRPin, 0);
 }
 
-void WriteToOutput()
+void pid1_WriteToOutput()
 {
-  analogWrite(SSRPin, output);
+  analogWrite(pid1_SSRPin, pid1_output);
 }
 
-void WriteToOutput2()
+void pid2_WriteToOutput()
 {
-  analogWrite(SSRPin2, output2);
+  analogWrite(pid2_SSRPin, pid2_output);
 }
 
-void changeAutoTune()
+void pid1_changeAutoTune()
 {
-  if(!tuning)
+  if(!pid1_tuning)
   {
     //initiate autotune
-    AutoTuneHelper(true);
-    aTune.SetNoiseBand(aTuneNoise);
-    aTune.SetOutputStep(aTuneStep);
-    aTune.SetLookbackSec((int)aTuneLookBack);
-    tuning = true;
+    pid1_AutoTuneHelper(true);
+    pid1_aTune.SetNoiseBand(pid1_aTuneNoise);
+    pid1_aTune.SetOutputStep(pid1_aTuneStep);
+    pid1_aTune.SetLookbackSec((int)pid1_aTuneLookBack);
+    pid1_tuning = true;
   }
   else
   { //cancel autotune
-    aTune.Cancel();
-    tuning = false;
-    AutoTuneHelper(false);
+    pid1_aTune.Cancel();
+    pid1_tuning = false;
+    pid1_AutoTuneHelper(false);
   }
 }
 
-void changeAutoTune2()
+void pid2_changeAutoTune()
 {
-  if(!tuning)
+  if(!pid2_tuning)
   {
     //initiate autotune
-    AutoTuneHelper2(true);
-    aTune2.SetNoiseBand(aTuneNoise);
-    aTune2.SetOutputStep(aTuneStep);
-    aTune2.SetLookbackSec((int)aTuneLookBack);
-    tuning2 = true;
+    pid2_AutoTuneHelper(true);
+    pid2_aTune.SetNoiseBand(pid2_aTuneNoise);
+    pid2_aTune.SetOutputStep(pid2_aTuneStep);
+    pid2_aTune.SetLookbackSec((int)pid2_aTuneLookBack);
+    pid2_tuning = true;
   }
   else
   { //cancel autotune
-    aTune2.Cancel();
-    tuning2 = false;
-    AutoTuneHelper2(false);
+    pid2_aTune.Cancel();
+    pid2_tuning = false;
+    pid2_AutoTuneHelper(false);
   }
 }
 
-void AutoTuneHelper(boolean start)
+void pid1_AutoTuneHelper(boolean start)
 {
 
   if(start)
   {
-    ATuneModeRemember = myPID.GetMode();
-    myPID.SetMode(MANUAL);
+    pid1_ATuneModeRember = myPID1.GetMode();
+    myPID1.SetMode(MANUAL);
   }
   else
   {
-    modeIndex = ATuneModeRemember;
-    myPID.SetMode(modeIndex);
+    pid1_modeIndex = pid1_ATuneModeRember;
+    myPID1.SetMode(pid1_modeIndex);
   } 
 }
 
-void AutoTuneHelper2(boolean start)
+void pid2_AutoTuneHelper(boolean start)
 {
 
   if(start)
   {
-    ATuneModeRemember2 = myPID2.GetMode();
+    pid2_ATuneModeRember = myPID2.GetMode();
     myPID2.SetMode(MANUAL);
   }
   else
   {
-    modeIndex2 = ATuneModeRemember2;
-    myPID.SetMode(modeIndex2);
+    pid2_modeIndex = pid2_ATuneModeRember;
+    myPID2.SetMode(pid2_modeIndex);
   } 
 }
 
-void StartProfile()
+void pid1_StartProfile()
 {
-  if(!runningProfile)
+  if(!pid1_runningProfile)
   {
     //initialize profle
-    curProfStep=0;
-    runningProfile = true;
-    calcNextProf();
+    pid1_curProfStep=0;
+    pid1_runningProfile = true;
+    pid1_calcNextProf();
   }
 }
 
-void StartProfile2()
+void pid2_StartProfile()
 {
-  if(!runningProfile2)
+  if(!pid2_runningProfile)
   {
     //initialize profle
-    curProfStep2=0;
-    runningProfile2 = true;
-    calcNextProf2();
+    pid2_curProfStep=0;
+    pid2_runningProfile = true;
+    pid2_calcNextProf();
   }
 }
 
-void StopProfile()
+void pid1_StopProfile()
 {
-  if(runningProfile)
+  if(pid1_runningProfile)
   {
-    curProfStep=nProfSteps;
-    calcNextProf(); //runningProfile will be set to false in here
+    pid1_curProfStep=pid1_nProfSteps;
+    pid1_calcNextProf(); //pid1_runningProfile will be set to false in here
   } 
 }
 
-void StopProfile2()
+void pid2_StopProfile()
 {
-  if(runningProfile2)
+  if(pid2_runningProfile)
   {
-    curProfStep2=nProfSteps2;
-    calcNextProf2(); //runningProfile will be set to false in here
+    pid2_curProfStep=pid2_nProfSteps;
+    pid2_calcNextProf(); //runningProfile will be set to false in here
   } 
 }
 
-void ProfileRunTime()
+void pid1_ProfileRunTime()
 {
-  if(tuning || !runningProfile) return;
+  if(pid1_tuning || !pid1_runningProfile) return;
  
-  boolean gotonext = false;
+  boolean pid1_gotonext = false;
 
   //what are we doing?
-  if(curType==1) //ramp
+  if(pid1_curType==1) //ramp
   {
     //determine the value of the setpoint
-    if(now>helperTime)
+    if(now>pid1_helperTime)
     {
-      setpoint = curVal;
-      gotonext=true;
+      pid1_setpoint = pid1_curVal;
+      pid1_gotonext=true;
     }
     else
     {
-      setpoint = (curVal-helperVal)*(1-(float)(helperTime-now)/(float)(curTime))+helperVal; 
+      pid1_setpoint = (pid1_curVal-pid1_helperVal)*(1-(float)(pid1_helperTime-now)/(float)(pid1_curTime))+pid1_helperVal; 
     }
   }
-  else if (curType==2) //wait
+  else if (pid1_curType==2) //wait
   {
-    float err = input-setpoint;
-    if(helperflag) //we're just looking for a cross
+    float pid1_err = pid1_input-pid1_setpoint;
+    if(pid1_helperFlag) //we're just looking for a cross
     {
 
-      if(err==0 || (err>0 && helperVal<0) || (err<0 && helperVal>0)) gotonext=true;
-      else helperVal = err;
+      if(pid1_err==0 || (pid1_err>0 && pid1_helperVal<0) || (pid1_err<0 && pid1_helperVal>0)) pid1_gotonext=true;
+      else pid1_helperVal = pid1_err;
     }
     else //value needs to be within the band for the perscribed time
     {
-      if (abs(err)>curVal) helperTime=now; //reset the clock
-      else if( (now-helperTime)>=curTime) gotonext=true; //we held for long enough
+      if (abs(pid1_err)>pid1_curVal) pid1_helperTime=now; //reset the clock
+      else if( (now-pid1_helperTime)>=pid1_curTime) pid1_gotonext=true; //we held for long enough
     }
 
   }
-  else if(curType==3) //step
+  else if(pid1_curType==3) //step
   {
 
-    if((now-helperTime)>curTime)gotonext=true;
+    if((now-pid1_helperTime)>pid1_curTime)pid1_gotonext=true;
   }
-  else if(curType==127) //buzz
+  else if(pid1_curType==127) //buzz
   {
-    if(now<helperTime)digitalWrite(buzzerPin,HIGH);
+    if(now<pid1_helperTime)digitalWrite(buzzerPin,HIGH);
     else 
     {
        digitalWrite(buzzerPin,LOW);
-       gotonext=true;
+       pid1_gotonext=true;
     }
   }
   else
   { //unrecognized type, kill the profile
-    curProfStep=nProfSteps;
-    gotonext=true;
+    pid1_curProfStep=pid1_nProfSteps;
+    pid1_gotonext=true;
   }
-  if(gotonext)
+  if(pid1_gotonext)
   {
-    curProfStep++;
-    calcNextProf();
+    pid1_curProfStep++;
+    pid1_calcNextProf();
   }
 }
 
-void ProfileRunTime2()
+void pid2_ProfileRunTime()
 {
-  if(tuning2 || !runningProfile2) return;
+  if(pid2_tuning || !pid2_runningProfile) return;
  
-  boolean gotonext2 = false;
+  boolean pid2_gotonext = false;
 
   //what are we doing?
-  if(curType2==1) //ramp
+  if(pid2_curType==1) //ramp
   {
     //determine the value of the setpoint
-    if(now>helperTime2)
+    if(now>pid2_helperTime)
     {
-      setpoint2 = curVal2;
-      gotonext2=true;
+      pid2_setpoint = pid2_curVal;
+      pid2_gotonext=true;
     }
     else
     {
-      setpoint2 = (curVal2-helperVal2)*(1-(float)(helperTime2-now)/(float)(curTime2))+helperVal2; 
+      pid2_setpoint = (pid2_curVal-pid2_helperVal)*(1-(float)(pid2_helperTime-now)/(float)(pid2_curTime))+pid2_helperVal; 
     }
   }
-  else if (curType2==2) //wait
+  else if (pid2_curType==2) //wait
   {
-    float err2 = input2-setpoint2;
-    if(helperflag2) //we're just looking for a cross
+    float pid2_err = pid2_input-pid2_setpoint;
+    if(pid2_helperFlag) //we're just looking for a cross
     {
 
-      if(err2==0 || (err2>0 && helperVal2<0) || (err2<0 && helperVal2>0)) gotonext2=true;
-      else helperVal2 = err2;
+      if(pid2_err==0 || (pid2_err>0 && pid2_helperVal<0) || (pid2_err<0 && pid2_helperVal>0)) pid2_gotonext=true;
+      else pid2_helperVal = pid2_err;
     }
     else //value needs to be within the band for the perscribed time
     {
-      if (abs(err2)>curVal2) helperTime2=now; //reset the clock
-      else if( (now-helperTime2)>=curTime2) gotonext2=true; //we held for long enough
+      if (abs(pid2_err)>pid2_curVal) pid2_helperTime=now; //reset the clock
+      else if( (now-pid2_helperTime)>=pid2_curTime) pid2_gotonext=true; //we held for long enough
     }
 
   }
-  else if(curType2==3) //step
+  else if(pid2_curType==3) //step
   {
 
-    if((now-helperTime2)>curTime2)gotonext2=true;
+    if((now-pid2_helperTime)>pid2_curTime)pid2_gotonext=true;
   }
-  else if(curType2==127) //buzz
+  else if(pid2_curType==127) //buzz
   {
-    if(now<helperTime2)digitalWrite(buzzerPin,HIGH);
+    if(now<pid2_helperTime)digitalWrite(buzzerPin,HIGH);
     else 
     {
        digitalWrite(buzzerPin,LOW);
-       gotonext2=true;
+       pid2_gotonext=true;
     }
   }
   else
   { //unrecognized type, kill the profile
-    curProfStep2=nProfSteps2;
-    gotonext2=true;
+    pid2_curProfStep=pid2_nProfSteps;
+    pid2_gotonext=true;
   }
-  if(gotonext2)
+  if(pid2_gotonext)
   {
-    curProfStep2++;
-    calcNextProf2();
+    pid2_curProfStep++;
+    pid2_calcNextProf();
   }
 }
 
-void calcNextProf()
+void pid1_calcNextProf()
 {
-  if(curProfStep>=nProfSteps) 
+  if(pid1_curProfStep>=pid1_nProfSteps) 
   {
-    curType=0;
-    helperTime=0;
+    pid1_curType=0;
+    pid1_helperTime=0;
   }
   else
   { 
-    curType = proftypes[curProfStep];
-    curVal = profvals[curProfStep];
-    curTime = proftimes[curProfStep];
+    pid1_curType = pid1_profTypes[pid1_curProfStep];
+    pid1_curVal = pid1_profVals[pid1_curProfStep];
+    pid1_curTime = pid1_profTimes[pid1_curProfStep];
   }
-  if(curType==1) //ramp
+  if(pid1_curType==1) //ramp
   {
-    helperTime = curTime + now; //at what time the ramp will end
-    helperVal = setpoint;
+    pid1_helperTime = pid1_curTime + now; //at what time the ramp will end
+    pid1_helperVal = pid1_setpoint;
   }   
-  else if(curType==2) //wait
+  else if(pid1_curType==2) //wait
   {
-    helperflag = (curVal==0);
-    if(helperflag) helperVal= input-setpoint;
-    else helperTime=now; 
+    pid1_helperFlag = (pid1_curVal==0);
+    if(pid1_helperFlag) pid1_helperVal= pid1_input-pid1_setpoint;
+    else pid1_helperTime=now; 
   }
-  else if(curType==3) //step
+  else if(pid1_curType==3) //step
   {
-    setpoint = curVal;
-    helperTime = now;
+    pid1_setpoint = pid1_curVal;
+    pid1_helperTime = now;
   }
-  else if(curType==127) //buzzer
+  else if(pid1_curType==127) //buzzer
   {
-    helperTime = now + curTime;    
+    pid1_helperTime = now + pid1_curTime;    
   }
   else
   {
-    curType=0;
+    pid1_curType=0;
   }
 
-  if(curType==0) //end
+  if(pid1_curType==0) //end
   { //we're done 
-    runningProfile=false;
-    curProfStep=0;
+    pid1_runningProfile=false;
+    pid1_curProfStep=0;
     Serial.println("P_DN");
     digitalWrite(buzzerPin,LOW);
   } 
   else
   {
     Serial.print("P_STP ");
-    Serial.print(int(curProfStep));
+    Serial.print(int(pid1_curProfStep));
     Serial.print(" ");
-    Serial.print(int(curType));
+    Serial.print(int(pid1_curType));
     Serial.print(" ");
-    Serial.print((curVal));
+    Serial.print((pid1_curVal));
     Serial.print(" ");
-    Serial.println((curTime));
+    Serial.println((pid1_curTime));
   }
 }
 
-void calcNextProf2()
+void pid2_calcNextProf()
 {
-  if(curProfStep2>=nProfSteps2) 
+  if(pid2_curProfStep>=pid2_nProfSteps) 
   {
-    curType2=0;
-    helperTime2 =0;
+    pid2_curType=0;
+    pid2_helperTime =0;
   }
   else
   { 
-    curType2 = proftypes2[curProfStep2];
-    curVal2 = profvals2[curProfStep2];
-    curTime2 = proftimes2[curProfStep2];
+    pid2_curType = pid2_profTypes[pid2_curProfStep];
+    pid2_curVal = pid2_profVals[pid2_curProfStep];
+    pid2_curTime = pid2_profTimes[pid2_curProfStep];
   }
-  if(curType2==1) //ramp
+  if(pid2_curType==1) //ramp
   {
-    helperTime2 = curTime2 + now; //at what time the ramp will end
-    helperVal2 = setpoint2;
+    pid2_helperTime = pid2_curTime + now; //at what time the ramp will end
+    pid2_helperVal = pid2_setpoint;
   }   
-  else if(curType2==2) //wait
+  else if(pid2_curType==2) //wait
   {
-    helperflag2 = (curVal2==0);
-    if(helperflag2) helperVal2= input2-setpoint2;
-    else helperTime2=now; 
+    pid2_helperFlag = (pid2_curVal==0);
+    if(pid2_helperFlag) pid2_helperVal= pid2_input-pid2_setpoint;
+    else pid2_helperTime=now; 
   }
-  else if(curType2==3) //step
+  else if(pid2_curType==3) //step
   {
-    setpoint2 = curVal2;
-    helperTime2 = now;
+    pid2_setpoint = pid2_curVal;
+    pid2_helperTime = now;
   }
-  else if(curType2==127) //buzzer
+  else if(pid2_curType==127) //buzzer
   {
-    helperTime2 = now + curTime2;    
+    pid2_helperTime = now + pid2_curTime;    
   }
   else
   {
-    curType2=0;
+    pid2_curType=0;
   }
 
-  if(curType2==0) //end
+  if(pid2_curType==0) //end
   { //we're done 
-    runningProfile2=false;
-    curProfStep2=0;
+    pid2_runningProfile=false;
+    pid2_curProfStep=0;
     Serial.println("P2_DN");
     digitalWrite(buzzerPin,LOW);
   } 
   else
   {
     Serial.print("P2_STP ");
-    Serial.print(int(curProfStep2));
+    Serial.print(int(pid2_curProfStep));
     Serial.print(" ");
-    Serial.print(int(curType2));
+    Serial.print(int(pid2_curType));
     Serial.print(" ");
-    Serial.print((curVal2));
+    Serial.print((pid2_curVal));
     Serial.print(" ");
-    Serial.println((curTime2));
+    Serial.println((pid2_curTime));
   }
 }
 
 
 
-const int eepromTuningOffset = 1; //13 bytes
-const int eepromATuneOffset = 14; //12 bytes
-const int eepromTuningOffset2 = 26; //13 bytes
-const int eepromATuneOffset2 = 39; //12 bytes
-const int eepromProfileOffset = 51; //128 bytes
-const int eepromProfileOffset2 = 179; //128 bytes
+const int pid1_eepromTuningOffset = 1; //13 bytes
+const int pid1_eepromATuneOffset = 14; //12 bytes
+const int pid2_eepromTuningOffset = 26; //13 bytes
+const int pid2_eepromATuneOffset = 39; //12 bytes
+const int pid1_eepromProfileOffset = 51; //128 bytes
+const int pid2_eepromProfileOffset = 179; //128 bytes
 
 
 void initializeEEPROM()
@@ -823,66 +770,66 @@ void EEPROMreset()
 
 void EEPROMBackupTunings()
 {
-  EEPROM.write(eepromTuningOffset,ctrlDirection);
-  EEPROM_writeAnything(eepromTuningOffset+1,kp);
-  EEPROM_writeAnything(eepromTuningOffset+5,ki);
-  EEPROM_writeAnything(eepromTuningOffset+9,kd);
-  EEPROM.write(eepromTuningOffset2,ctrlDirection2);
-  EEPROM_writeAnything(eepromTuningOffset2+1,kp2);
-  EEPROM_writeAnything(eepromTuningOffset2+5,ki2);
-  EEPROM_writeAnything(eepromTuningOffset2+9,kd2);
+  EEPROM.write(pid1_eepromTuningOffset,pid1_ctrlDirection);
+  EEPROM_writeAnything(pid1_eepromTuningOffset+1,pid1_kp);
+  EEPROM_writeAnything(pid1_eepromTuningOffset+5,pid1_ki);
+  EEPROM_writeAnything(pid1_eepromTuningOffset+9,pid1_kd);
+  EEPROM.write(pid2_eepromTuningOffset,pid2_ctrlDirection);
+  EEPROM_writeAnything(pid2_eepromTuningOffset+1,pid2_kp);
+  EEPROM_writeAnything(pid2_eepromTuningOffset+5,pid2_ki);
+  EEPROM_writeAnything(pid2_eepromTuningOffset+9,pid2_kd);
 }
 
 void EEPROMRestoreTunings()
 {
-  ctrlDirection = EEPROM.read(eepromTuningOffset);
-  EEPROM_readAnything(eepromTuningOffset+1,kp);
-  EEPROM_readAnything(eepromTuningOffset+5,ki);
-  EEPROM_readAnything(eepromTuningOffset+9,kd);
-  ctrlDirection2 = EEPROM.read(eepromTuningOffset2);
-  EEPROM_readAnything(eepromTuningOffset2+1,kp2);
-  EEPROM_readAnything(eepromTuningOffset2+5,ki2);
-  EEPROM_readAnything(eepromTuningOffset2+9,kd2);
+  pid1_ctrlDirection = EEPROM.read(pid1_eepromTuningOffset);
+  EEPROM_readAnything(pid1_eepromTuningOffset+1,pid1_kp);
+  EEPROM_readAnything(pid1_eepromTuningOffset+5,pid1_ki);
+  EEPROM_readAnything(pid1_eepromTuningOffset+9,pid1_kd);
+  pid2_ctrlDirection = EEPROM.read(pid2_eepromTuningOffset);
+  EEPROM_readAnything(pid2_eepromTuningOffset+1,pid2_kp);
+  EEPROM_readAnything(pid2_eepromTuningOffset+5,pid2_ki);
+  EEPROM_readAnything(pid2_eepromTuningOffset+9,pid2_kd);
 }
 
 void EEPROMBackupATune()
 {
-  EEPROM_writeAnything(eepromATuneOffset,aTuneStep);
-  EEPROM_writeAnything(eepromATuneOffset+4,aTuneNoise);
-  EEPROM_writeAnything(eepromATuneOffset+8,aTuneLookBack);
-  EEPROM_writeAnything(eepromATuneOffset2,aTuneStep2);
-  EEPROM_writeAnything(eepromATuneOffset2+4,aTuneNoise2);
-  EEPROM_writeAnything(eepromATuneOffset2+8,aTuneLookBack2);
+  EEPROM_writeAnything(pid1_eepromATuneOffset,pid1_aTuneStep);
+  EEPROM_writeAnything(pid1_eepromATuneOffset+4,pid1_aTuneNoise);
+  EEPROM_writeAnything(pid1_eepromATuneOffset+8,pid1_aTuneLookBack);
+  EEPROM_writeAnything(pid2_eepromATuneOffset,pid2_aTuneStep);
+  EEPROM_writeAnything(pid2_eepromATuneOffset+4,pid2_aTuneNoise);
+  EEPROM_writeAnything(pid2_eepromATuneOffset+8,pid2_aTuneLookBack);
 }
 
 void EEPROMRestoreATune()
 {
-  EEPROM_readAnything(eepromATuneOffset,aTuneStep);
-  EEPROM_readAnything(eepromATuneOffset+4,aTuneNoise);
-  EEPROM_readAnything(eepromATuneOffset+8,aTuneLookBack);
-  EEPROM_readAnything(eepromATuneOffset2,aTuneStep2);
-  EEPROM_readAnything(eepromATuneOffset2+4,aTuneNoise2);
-  EEPROM_readAnything(eepromATuneOffset2+8,aTuneLookBack2);
+  EEPROM_readAnything(pid1_eepromATuneOffset,pid1_aTuneStep);
+  EEPROM_readAnything(pid1_eepromATuneOffset+4,pid1_aTuneNoise);
+  EEPROM_readAnything(pid1_eepromATuneOffset+8,pid1_aTuneLookBack);
+  EEPROM_readAnything(pid2_eepromATuneOffset,pid2_aTuneStep);
+  EEPROM_readAnything(pid2_eepromATuneOffset+4,pid2_aTuneNoise);
+  EEPROM_readAnything(pid2_eepromATuneOffset+8,pid2_aTuneLookBack);
 }
 
 void EEPROMBackupProfile()
 {
-  EEPROM_writeAnything(eepromProfileOffset, proftypes);
-  EEPROM_writeAnything(eepromProfileOffset + 16, profvals);
-  EEPROM_writeAnything(eepromProfileOffset + 77, proftimes); //there might be a slight issue here (/1000?)
-  EEPROM_writeAnything(eepromProfileOffset2, proftypes);
-  EEPROM_writeAnything(eepromProfileOffset2 + 16, profvals);
-  EEPROM_writeAnything(eepromProfileOffset2 + 77, proftimes); //there might be a slight issue here (/1000?)
+  EEPROM_writeAnything(pid1_eepromProfileOffset, pid1_profTypes);
+  EEPROM_writeAnything(pid1_eepromProfileOffset + 16, pid1_profVals);
+  EEPROM_writeAnything(pid1_eepromProfileOffset + 77, pid1_profTimes); //there might be a slight issue here (/1000?)
+  EEPROM_writeAnything(pid2_eepromProfileOffset, pid2_profTypes);
+  EEPROM_writeAnything(pid2_eepromProfileOffset + 16, pid2_profVals);
+  EEPROM_writeAnything(pid2_eepromProfileOffset + 77, pid2_profTimes); //there might be a slight issue here (/1000?)
 }
 
 void EEPROMRestoreProfile()
 {
-  EEPROM_readAnything(eepromProfileOffset, proftypes);
-  EEPROM_readAnything(eepromProfileOffset + 16, profvals);
-  EEPROM_readAnything(eepromProfileOffset + 77, proftimes); //there might be a slight issue here (/1000?)
-  EEPROM_readAnything(eepromProfileOffset2, proftypes);
-  EEPROM_readAnything(eepromProfileOffset2 + 16, profvals);
-  EEPROM_readAnything(eepromProfileOffset2 + 77, proftimes); //there might be a slight issue here (/1000?)
+  EEPROM_readAnything(pid1_eepromProfileOffset, pid1_profTypes);
+  EEPROM_readAnything(pid1_eepromProfileOffset + 16, pid1_profVals);
+  EEPROM_readAnything(pid1_eepromProfileOffset + 77, pid1_profTimes); //there might be a slight issue here (/1000?)
+  EEPROM_readAnything(pid2_eepromProfileOffset, pid2_profTypes);
+  EEPROM_readAnything(pid2_eepromProfileOffset + 16, pid2_profVals);
+  EEPROM_readAnything(pid2_eepromProfileOffset + 77, pid2_profTimes); //there might be a slight issue here (/1000?)
 }
 
 /********************************************
@@ -905,6 +852,8 @@ foo;                   // float array
 //  * send the bytes to the arduino
 //  * use a data structure known as a union to convert
 //    the array of bytes back into an array of floats
+
+
 void SerialReceive()
 {
 
@@ -912,13 +861,13 @@ void SerialReceive()
   
   byte identifier=0;
   byte index=0;
-  byte val=0,val2=0,val3=0;
+  byte pid1_Val=0,pid2_Val=0,val3=0;
 
   if(Serial.available())
   {
     byte identifier = Serial.read();
-    byte val = Serial.read();
-    byte val2 = Serial.read();
+    byte pid1_Val = Serial.read();
+    byte pid2_Val = Serial.read();
     while (Serial.available())
     {
       byte val3 = Serial.read();
@@ -938,16 +887,16 @@ void SerialReceive()
         ReceiveAtune();
         break;
       case 3: //EEPROM reset
-        if((val==9) && (val2==8))
+        if((pid1_Val==9) && (pid2_Val==8))
         {
           EEPROMreset(); 
         }
         break;
       case 4:  //receiving profile
-        ReceiveProfile();
+        pid1_ReceiveProfile();
         break;
       case 5:  //receiving profile2
-        ReceiveProfile2();
+        pid2_ReceiveProfile();
         break;
       case 6: //profile command
         ProfileCommand();
@@ -960,110 +909,110 @@ void SerialReceive()
 
 void ReceiveSettings()
 {
-  setpoint=double(foo.asFloat[0]);
-  setpoint2=double(foo.asFloat[1]);
-  if(val==0)                              // * change PID1 mode to manual and set output 
+  pid1_setpoint=double(foo.asFloat[0]);
+  pid2_setpoint=double(foo.asFloat[1]);
+  if(pid1_Val==0)                              // * change PID1 mode to manual and set output 
   {
-    myPID.SetMode(MANUAL);
-    modeIndex=0;
-    output=double(foo.asFloat[2]);
+    myPID1.SetMode(MANUAL);
+    pid1_modeIndex=0;
+    pid1_output=double(foo.asFloat[2]);
   }
   else 
   {
-    myPID.SetMode(AUTOMATIC);
-    modeIndex=1;
+    myPID1.SetMode(AUTOMATIC);
+    pid1_modeIndex=1;
   }
 
-  if(val2==0)                              // * change PID2 mode to manual and set output
+  if(pid2_Val==0)                              // * change PID2 mode to manual and set output
   {
     myPID2.SetMode(MANUAL);
-    modeIndex2=0;
-    output2=double(foo.asFloat[3]);
+    pid2_modeIndex=0;
+    pid2_output=double(foo.asFloat[3]);
   }
   else 
   {
     myPID2.SetMode(AUTOMATIC);
-    modeIndex2=1;
+    pid2_modeIndex=1;
   }
   sendDash = true;
 }
   
 void ReceiveTunings()
 {
-  kp = double(foo.asFloat[0]);
-  kp2 = double(foo.asFloat[1]);
-  ki = double(foo.asFloat[2]);
-  ki2 = double(foo.asFloat[3]);
-  kd = double(foo.asFloat[4]);
-  kd2 = double(foo.asFloat[5]);
-  ctrlDirection = val;
-  ctrlDirection2 = val2;
-  myPID.SetTunings(kp, ki, kd);
-  myPID2.SetTunings(kp2, ki2, kd2);
-  if(val==0) myPID.SetControllerDirection(DIRECT);
-  else myPID.SetControllerDirection(REVERSE);
-  if(val2==0) myPID.SetControllerDirection(DIRECT);
-  else myPID.SetControllerDirection(REVERSE);
+  pid1_kp = double(foo.asFloat[0]);
+  pid2_kp = double(foo.asFloat[1]);
+  pid1_ki = double(foo.asFloat[2]);
+  pid2_ki = double(foo.asFloat[3]);
+  pid1_kd = double(foo.asFloat[4]);
+  pid2_kd = double(foo.asFloat[5]);
+  pid1_ctrlDirection = pid1_Val;
+  pid2_ctrlDirection = pid2_Val;
+  myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
+  myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
+  if(pid1_Val==0) myPID1.SetControllerDirection(DIRECT);
+  else myPID1.SetControllerDirection(REVERSE);
+  if(pid2_Val==0) myPID2.SetControllerDirection(DIRECT);
+  else myPID2.SetControllerDirection(REVERSE);
   EEPROMBackupTunings();
   sendTune = true;
 }
 
 void ReceiveAtune()
 {
-  aTuneStep = foo.asFloat[0];
-  aTuneStep2 = foo.asFloat[1];
-  aTuneNoise = foo.asFloat[2];
-  aTuneNoise2 = foo.asFloat[3];  
-  aTuneLookBack = (unsigned int)foo.asFloat[4];
-  aTuneLookBack2 = (unsigned int)foo.asFloat[5];
-  if((val==0 && tuning) || (val==1 && !tuning))
+  pid1_aTuneStep = foo.asFloat[0];
+  pid2_aTuneStep = foo.asFloat[1];
+  pid1_aTuneNoise = foo.asFloat[2];
+  pid2_aTuneNoise = foo.asFloat[3];  
+  pid1_aTuneLookBack = (unsigned int)foo.asFloat[4];
+  pid2_aTuneLookBack = (unsigned int)foo.asFloat[5];
+  if((pid1_Val==0 && pid1_tuning) || (pid1_Val==1 && !pid1_tuning))
   { //toggle autotune state
-    changeAutoTune();
+    pid1_changeAutoTune();
   }
-  if((val2==0 && tuning2) || (val2==1 && !tuning2))
+  if((pid2_Val==0 && pid2_tuning) || (pid2_Val==1 && !pid2_tuning))
   { //toggle autotune state
-    changeAutoTune2();
+    pid2_changeAutoTune();
   }
   EEPROMBackupATune();
   sendAtune = true;   
 }
 
-void ReceiveProfile()
+void pid1_ReceiveProfile()
 {
-  val=nProfSteps;
-  receivingProfile=true;
-  if(runningProfile)                          //stop the current profile execution
+  pid1_Val=pid1_nProfSteps;
+  pid1_receivingProfile=true;
+  if(pid1_runningProfile)                          //stop the current profile execution
   {
-    StopProfile();
+    pid1_StopProfile();
   }
-  if(!val2)                               // store profile receive start time
+  if(!pid1_Val)                               // store profile receive start time
   {
-    profReceiveStart = millis();
+    pid1_profReceiveStart = millis();
   }
-  while(receivingProfile)
+  while(pid1_receivingProfile)
   {
-    if((millis() - profReceiveStart) >= 1000) //there was a timeout issue.  reset this transfer
+    if((millis() - pid1_profReceiveStart) >= 1000) //there was a timeout issue.  reset this transfer
     {
-      receivingProfile=false;
+      pid1_receivingProfile=false;
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(val2>=nProfSteps)                      // profile receive complete
+    if(pid1_Val>=pid1_nProfSteps)                      // profile receive complete
     {
-      receivingProfile=false;
+      pid1_receivingProfile=false;
       Serial.print("ProfDone ");              // acknowledge profile recieve completed
       EEPROMBackupProfile();
       Serial.println("Archived");             // acknowledge profile stored
     }
     else                                      // read in profile step values
     {
-      profvals[val2] = foo.asFloat[0];
-      proftimes[val2] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid1_profVals[pid1_Val] = foo.asFloat[0];
+      pid1_profTimes[pid1_Val] = (unsigned long)(foo.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
     byte index=0;                                 // read in next profile step bytes
-    byte val2 = Serial.read();
+    byte pid1_Val = Serial.read();
     while (Serial.available())
     {
       byte val3 = Serial.read();
@@ -1073,42 +1022,42 @@ void ReceiveProfile()
   }
 }
 
-void ReceiveProfile2()
+void pid2_ReceiveProfile()
 {
-  val=nProfSteps2;
-  receivingProfile=true;
-  if(runningProfile2)                          //stop the current profile execution
+  pid2_Val=pid2_nProfSteps;
+  pid2_receivingProfile=true;
+  if(pid2_runningProfile)                          //stop the current profile execution
   {
-    StopProfile2();
+    pid2_StopProfile();
   }
-  while(receivingProfile)
+  while(pid2_receivingProfile)
   {
-    if((millis() - profReceiveStart) >= 1000) //there was a timeout issue.  reset this transfer
+    if((millis() - pid2_profReceiveStart) >= 1000) //there was a timeout issue.  reset this transfer
     {
-      receivingProfile=false;
+      pid2_receivingProfile=false;
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(val2==0)                               // store profile receive start time
+    if(pid2_Val==0)                               // store profile receive start time
     {
-      profReceiveStart = millis();
+      pid2_profReceiveStart = millis();
     }
-    if(val2>=nProfSteps)                      // profile receive complete
+    if(pid2_Val>=pid2_nProfSteps)                      // profile receive complete
     {
-      receivingProfile=false;
+      pid2_receivingProfile=false;
       Serial.print("ProfDone ");              // acknowledge profile recieve completed
       EEPROMBackupProfile();
       Serial.println("Archived");             // acknowledge profile stored
     }
     else                                      // read in profile step values
     {
-      profvals2[val2] = foo.asFloat[0];
-      proftimes2[val2] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid2_profVals[pid2_Val] = foo.asFloat[0];
+      pid2_profTimes[pid2_Val] = (unsigned long)(foo.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
     byte index=0;                                 // read in next profile step bytes
-    byte val2 = Serial.read();
+    byte pid2_Val = Serial.read();
     while (Serial.available())
     {
       byte val3 = Serial.read();
@@ -1120,10 +1069,10 @@ void ReceiveProfile2()
 
 void ProfileCommand()
 {
-  if(!val && !runningProfile) StartProfile();
-  if(val && runningProfile) StopProfile();
-  if(!val2 && !runningProfile2) StartProfile2();
-  if(val2 && runningProfile2) StopProfile2();
+  if(!pid1_Val && !pid1_runningProfile) pid1_StartProfile();
+  if(pid1_Val && pid1_runningProfile) pid1_StopProfile();
+  if(!pid2_Val && !pid2_runningProfile) pid2_StartProfile();
+  if(pid2_Val && pid2_runningProfile) pid2_StopProfile();
 }
 
 
@@ -1131,6 +1080,7 @@ void ProfileCommand()
 // has no problem converting strings into floats, so
 // we can just send strings.  much easier than getting
 // floats from processing to here no?
+
 void SerialSend()
 {
   if(sendInfo)
@@ -1141,107 +1091,165 @@ void SerialSend()
   }
   if(sendDash)
   {
-    Serial.print("DASH ");
-    Serial.print(setpoint); 
+    // Header
+    Serial.print("DASH"); // 0
     Serial.print(" ");
-    Serial.print(setpoint2); 
+    // PID 001
+    //*************************************
+    Serial.print(pid1_setpoint);  //1                
+    Serial.print(" "); 
+    if(isnan(pid1_input)) Serial.print(pid1_error);  
+    else Serial.print(pid1_input); // 2
+    Serial.print(" ");                
+    Serial.print(pid1_output); // 3                 
     Serial.print(" ");
-    if(isnan(input)) Serial.print(error);
-    else Serial.print(input); 
+    Serial.print(myPID1.GetMode()); // 4
     Serial.print(" ");
-    if(isnan(input2)) Serial.print(error2);
-    else Serial.print(input2); 
+    
+    // PID 002
+    //**************************************
+    Serial.print(pid2_setpoint); // 5
     Serial.print(" ");
-    Serial.print(output); 
+    if(isnan(pid2_input)) Serial.print(pid2_error);
+    else Serial.print(pid2_input); // 6
     Serial.print(" ");
-    Serial.print(output2); 
+    Serial.print(pid2_output); // 7
+    Serial.print(" ");    
+    Serial.print(myPID2.GetMode()); // 8
     Serial.print(" ");
-    Serial.print(myPID.GetMode());
+    
+    //Raw Sensor Readings
+    //*************************************
+    Serial.print(tempcheckSensor1); // 9
     Serial.print(" ");
-    Serial.print(myPID2.GetMode());
+    Serial.print(tempcheckSensor2); // 10
     Serial.print(" ");
-    Serial.print(tempcheckSensor1);
+    Serial.print(tempcheckSensor3); // 11
     Serial.print(" ");
-    Serial.print(tempcheckSensor2);
+    Serial.print(tempcheckSensor4); // 12
     Serial.print(" ");
-    Serial.print(tempcheckSensor3);
+    Serial.print(tempcheckSensor5); // 13
     Serial.print(" ");
-    Serial.print(tempcheckSensor4);
+    Serial.print(tempcheckSensor6); // 14
     Serial.print(" ");
-    Serial.print(tempcheckSensor5);
-    Serial.print(" ");
-    Serial.print(tempcheckSensor6);
-    Serial.print(" ");
-    Serial.println(ackDash?1:0);
+    
+    // Ack
+    //*************************************
+    Serial.println(ackDash?1:0);    // 15
+   // Serial.print(" ");
     if(sendDash)sendDash=false;
   }
   if(sendTune)
   {
-    Serial.print("TUNE ");
-    Serial.print(myPID.GetKp()); 
+    // header
+    //*************************************
+    Serial.print("TUNE "); // 0
+    
+    // PID 001
+    //*************************************
+    Serial.print(myPID1.GetKp()); // 1
     Serial.print(" ");
-    Serial.print(myPID2.GetKp()); 
+    Serial.print(myPID1.GetKi()); // 2
     Serial.print(" ");
-    Serial.print(myPID.GetKi()); 
+    Serial.print(myPID1.GetKd()); // 3
     Serial.print(" ");
-    Serial.print(myPID2.GetKi()); 
+    Serial.print(myPID1.GetDirection()); // 4
     Serial.print(" ");
-    Serial.print(myPID.GetKd()); 
+    Serial.print(pid1_tuning?1:0); // 5
     Serial.print(" ");
-    Serial.print(myPID2.GetKd()); 
+    
+    // PID 002
+    //*************************************
+    Serial.print(myPID2.GetKp()); // 6
     Serial.print(" ");
-    Serial.print(myPID.GetDirection()); 
+    Serial.print(myPID2.GetKi()); // 7
     Serial.print(" ");
-    Serial.print(myPID2.GetDirection()); 
+    Serial.print(myPID2.GetKd()); // 8
     Serial.print(" ");
-    Serial.print(tuning?1:0);
+    Serial.print(myPID2.GetDirection()); // 9
     Serial.print(" ");
+    Serial.print(pid2_tuning?1:0); // 10
+    Serial.print(" ");
+           
     if(sendTune)sendTune=false;
   }
   if(sendAtune)
   {
-    Serial.print(aTuneStep); 
+    // PID 001
+    //*************************************
+    Serial.print(pid1_aTuneStep); // 11
     Serial.print(" ");
-    Serial.print(aTuneStep2); 
+    Serial.print(pid1_aTuneNoise); // 12
     Serial.print(" ");
-    Serial.print(aTuneNoise); 
+    Serial.print(pid1_aTuneLookBack); // 13
     Serial.print(" ");
-    Serial.print(aTuneNoise2); 
+    
+    // PID 002
+    //*************************************
+    Serial.print(pid2_aTuneStep); // 14
     Serial.print(" ");
-    Serial.print(aTuneLookBack); 
+    Serial.print(pid2_aTuneNoise); // 15
     Serial.print(" ");
-    Serial.print(aTuneLookBack2); 
+    Serial.print(pid2_aTuneLookBack); // 16
     Serial.print(" ");
-    Serial.println(ackTune?1:0);
+    
+    // ACK
+    //*************************************
+    Serial.println(ackTune?1:0); // 17
     if(sendAtune)sendAtune=false;
   }
-  if(runningProfile)
+  if(pid1_runningProfile)
   {
-    Serial.print("PROF ");
-    Serial.print(int(curProfStep));
+    Serial.print("PID1PROF ");
+    Serial.print(int(pid1_curProfStep));
     Serial.print(" ");
-    Serial.print(int(curType));
+    Serial.print(int(pid1_curType));
     Serial.print(" ");
-  }
-  switch(curType)
+  
+  switch(pid1_curType)
   {
     case 1: //ramp
-      Serial.println((helperTime-now)); //time remaining
+      Serial.println((pid1_helperTime-now)); //time remaining
       break;
     case 2: //wait
-      Serial.print(abs(input-setpoint));
+      Serial.print(abs(pid1_input-pid1_setpoint));
       Serial.print(" ");
-      Serial.println(curVal==0? -1 : float(now-helperTime));
+      Serial.println(pid1_curVal==0? -1 : float(now-pid1_helperTime));
       break;  
     case 3: //step
-      Serial.println(curTime-(now-helperTime));
+      Serial.println(pid1_curTime-(now-pid1_helperTime));
       break;
     default: 
       break;
   }
+  }  
+  if(pid2_runningProfile)
+  {
+    Serial.print("PID2PROF ");
+    Serial.print(int(pid2_curProfStep));
+    Serial.print(" ");
+    Serial.print(int(pid2_curType));
+    Serial.print(" ");
+  
+  switch(pid1_curType)
+  {
+    case 1: //ramp
+      Serial.println((pid2_helperTime-now)); //time remaining
+      break;
+    case 2: //wait
+      Serial.print(abs(pid2_input-pid2_setpoint));
+      Serial.print(" ");
+      Serial.println(pid2_curVal==0? -1 : float(now-pid2_helperTime));
+      break;  
+    case 3: //step
+      Serial.println(pid2_curTime-(now-pid2_helperTime));
+      break;
+    default: 
+      break;    
+      
+  }
 }
-
-
+}
 
 
 
