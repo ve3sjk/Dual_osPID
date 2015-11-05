@@ -82,13 +82,13 @@ bool pid1_tuning = false;
 bool pid2_tuning= false;
 
 double pid1_error, pid2_error;
-int pid1_Val, pid2_Val;
+int cmd_b0, cmd_b1;
 
-double pid1_setpoint=200, pid1_input=80, pid1_output=255, pid1_pidInput=80;
-double pid2_setpoint=100, pid2_input=30, pid2_output=255, pid2_pidInput=30;
+double pid1_setpoint=255, pid1_input=255, pid1_output=255, pid1_pidInput=255;
+double pid2_setpoint=100, pid2_input=100, pid2_output=100, pid2_pidInput=100;
 
-double pid1_kp = 10.0, pid1_ki = 0.0, pid1_kd = 0.0;
-double pid2_kp = 20.0, pid2_ki = 20.0, pid2_kd = 20.0;
+double pid1_kp=255, pid1_ki=255, pid1_kd=255;
+double pid2_kp=100, pid2_ki=100, pid2_kd=100;
 
 byte pid1_ctrlDirection = 1;
 byte pid2_ctrlDirection = 1;
@@ -99,12 +99,15 @@ byte databyte;
 PID myPID1(&pid1_pidInput, &pid1_output, &pid1_setpoint,pid1_kp,pid1_ki,pid1_kd, DIRECT);
 PID myPID2(&pid2_pidInput, &pid2_output, &pid2_setpoint,pid2_kp,pid2_ki,pid2_kd, DIRECT);
 
-double pid1_aTuneStep = 20.0, pid1_aTuneNoise = 1.0;
-double pid2_aTuneStep = 50.0, pid2_aTuneNoise = 2.0;
-unsigned int pid1_aTuneLookBack = 10.0;
-unsigned int pid2_aTuneLookBack = 30.0;
+double pid1_aTuneStep = 25.0, pid1_aTuneNoise = 25.0;
+double pid2_aTuneStep = 10.0, pid2_aTuneNoise = 10.0;
+
+unsigned int pid1_aTuneLookBack = 25.0;
+unsigned int pid2_aTuneLookBack = 10.0;
+
 byte pid1_ATuneModeRember = 0;
 byte pid2_ATuneModeRember = 0;
+
 PID_ATune pid1_aTune(&pid1_pidInput, &pid1_output);
 PID_ATune pid2_aTune(&pid2_pidInput, &pid2_output);
 
@@ -145,7 +148,7 @@ boolean pid2_runningProfile = false;
 
 void setup()
 {
-  TCCR1B = TCCR1B & 0b11111000 | 0x05;
+  TCCR1B = (TCCR1B & 0b11111000) | 0x05;
   Serial.begin(115200);
 //  buttonTime=1;
   ioTime=5;
@@ -189,7 +192,8 @@ byte editDepth=0;
 void loop()
 {
   now = millis();
-
+ // Serial.println(pid1_kp);
+ // Serial.println(now);
   bool doIO = now >= ioTime;
   //read in the input
   if(doIO)
@@ -204,13 +208,13 @@ void loop()
     pid2_pidInput = pid2_input;
   }
   
-  Serial.println("done input/output");
+  //Serial.println("done input/output");
 
   if(pid1_tuning)
   {
-    byte pid1_Val = (pid1_aTune.Runtime());
+    byte cmd_b0 = (pid1_aTune.Runtime());
 
-    if(pid1_Val != 0)
+    if(cmd_b0 != 0)
     {
       pid1_tuning = false;
     }
@@ -233,13 +237,13 @@ void loop()
     myPID1.Compute();
   }
 
-  Serial.println("done pid1 tuning check");
+ // Serial.println("done pid1 tuning check");
   
   if(pid2_tuning)
   {
-    byte pid2_Val = (pid2_aTune.Runtime());
+    byte cmd_b1 = (pid2_aTune.Runtime());
 
-    if(pid2_Val != 0)
+    if(cmd_b1 != 0)
     {
       pid2_tuning = false;
     }
@@ -261,7 +265,7 @@ void loop()
     //allow the pid to compute if necessary
     myPID2.Compute();
   }
-  Serial.println("done pid2 tuning check");
+ // Serial.println("done pid2 tuning check");
   if(doIO)
   {
     //send to output card
@@ -269,15 +273,15 @@ void loop()
     pid2_WriteToOutput();
   }
   
-  Serial.println("done send output");
+  //Serial.println("done send output");
   
   if(now>tft_Time)
   {
   drawTFT();
   tft_Time+=250;
   }
-  Serial.println("done tft");
-  
+//  Serial.println("done tft");
+//  Serial.println(serialTime);
   if(millis() > serialTime)
   {
 //    if(pid1_receivingProfile && (now-pid1_profReceiveStart)>pid1_profReceiveTimeout) pid1_receivingProfile = false;
@@ -285,12 +289,14 @@ void loop()
 //    if(pid2_receivingProfile && (now-pid2_profReceiveStart)>pid2_profReceiveTimeout) pid2_receivingProfile = false;
 //    Serial.println("pid2prof");
     SerialReceive();
-    Serial.println("done serial recv");
+  //  Serial.println("done serial recv");
     SerialSend();
-    Serial.println("done serial send");
+   // Serial.println("done serial send");
     serialTime += 500;
   }
 }
+//**********************************************end loop
+//******************************************************
 
 void drawTFT()
 {
@@ -321,37 +327,15 @@ void ReadDallas()
     tempcheckSensor4= sensors.getTempF(tempSensor4);
     tempcheckSensor5= sensors.getTempF(tempSensor5);
     tempcheckSensor6= sensors.getTempF(tempSensor6);
-//    sensors.requestTemperatures();
-//    tempcheckSensor1= tempcheckSensor1 + sensors.getTempF(tempSensor1);
-//    tempcheckSensor2= tempcheckSensor2 + sensors.getTempF(tempSensor2);
-//    tempcheckSensor3= tempcheckSensor3 + sensors.getTempF(tempSensor3);
-//    tempcheckSensor4= tempcheckSensor4 + sensors.getTempF(tempSensor4);
-//    tempcheckSensor5= tempcheckSensor5 + sensors.getTempF(tempSensor5);
-//    tempcheckSensor6= tempcheckSensor6 + sensors.getTempF(tempSensor6);
-//    sensors.requestTemperatures();
-//    tempcheckSensor1= tempcheckSensor1 + sensors.getTempF(tempSensor1);
-//    tempcheckSensor2= tempcheckSensor2 + sensors.getTempF(tempSensor2);
-//    tempcheckSensor3= tempcheckSensor3 + sensors.getTempF(tempSensor3);
-//    tempcheckSensor4= tempcheckSensor4 + sensors.getTempF(tempSensor4);
-//    tempcheckSensor5= tempcheckSensor5 + sensors.getTempF(tempSensor5);
-//    tempcheckSensor6= tempcheckSensor6 + sensors.getTempF(tempSensor6);
-//    
-//    tempcheckSensor1= tempcheckSensor1/3;
-//    tempcheckSensor2= tempcheckSensor2/3;
-//    tempcheckSensor3= tempcheckSensor3/3;
-//    tempcheckSensor4= tempcheckSensor4/3;
-//    tempcheckSensor5= tempcheckSensor5/3;
-//    tempcheckSensor6= tempcheckSensor6/3;
 
       pid1_input = tempcheckSensor4;
       pid2_input = tempcheckSensor5;
-
 }   
 
 //void ReadInput()
 //{
 //   double pid1_input = thermocouple.readThermocouple(CELSIUS);
-//   if (pid1_input==FAULT_OPEN || pid1_input==FAULT_SHORT_GND || pid1_input==FAULT_SHORT_VCC)
+//   if (pid1_input==FAULT_OPEN) || (pid1_input==FAULT_SHORT_GND) || (pid1_input==FAULT_SHORT_VCC))
 //   {
 //     pid1_error = pid1_input;
 //     pid1_input = NAN;
@@ -521,7 +505,7 @@ void pid1_ProfileRunTime()
       if(pid1_err==0 || (pid1_err>0 && pid1_helperVal<0) || (pid1_err<0 && pid1_helperVal>0)) pid1_gotonext=true;
       else pid1_helperVal = pid1_err;
     }
-    else //value needs to be within the band for the perscribed time
+    else //value needs to be within the band for the prescribed time
     {
       if (abs(pid1_err)>pid1_curVal) pid1_helperTime=now; //reset the clock
       else if( (now-pid1_helperTime)>=pid1_curTime) pid1_gotonext=true; //we held for long enough
@@ -774,10 +758,23 @@ void EEPROMBackupTunings()
   EEPROM_writeAnything(pid1_eepromTuningOffset+1,pid1_kp);
   EEPROM_writeAnything(pid1_eepromTuningOffset+5,pid1_ki);
   EEPROM_writeAnything(pid1_eepromTuningOffset+9,pid1_kd);
+ // Serial.println(pid1_eepromTuningOffset+1);
+ // Serial.println(pid1_kp);
+ // Serial.println(pid1_eepromTuningOffset+5);
+ // Serial.println(pid1_ki);
+  //Serial.println(pid1_eepromTuningOffset+9);
+//  Serial.println(pid1_kd);
   EEPROM.write(pid2_eepromTuningOffset,pid2_ctrlDirection);
   EEPROM_writeAnything(pid2_eepromTuningOffset+1,pid2_kp);
   EEPROM_writeAnything(pid2_eepromTuningOffset+5,pid2_ki);
   EEPROM_writeAnything(pid2_eepromTuningOffset+9,pid2_kd);
+//  Serial.println(pid2_eepromTuningOffset+1);
+//  Serial.println(pid2_kp);
+//  Serial.println(pid2_eepromTuningOffset+5);
+//  Serial.println(pid2_ki);
+//  Serial.println(pid2_eepromTuningOffset+9);
+//  Serial.println(pid2_kd);
+
 }
 
 void EEPROMRestoreTunings()
@@ -786,10 +783,25 @@ void EEPROMRestoreTunings()
   EEPROM_readAnything(pid1_eepromTuningOffset+1,pid1_kp);
   EEPROM_readAnything(pid1_eepromTuningOffset+5,pid1_ki);
   EEPROM_readAnything(pid1_eepromTuningOffset+9,pid1_kd);
+ // Serial.println(pid1_eepromTuningOffset+1);
+//  Serial.println(pid1_kp);
+ // Serial.println(pid1_eepromTuningOffset+5);
+ // Serial.println(pid1_ki);
+ // Serial.println(pid1_eepromTuningOffset+9);
+//  Serial.println(pid1_kd);
+  
   pid2_ctrlDirection = EEPROM.read(pid2_eepromTuningOffset);
   EEPROM_readAnything(pid2_eepromTuningOffset+1,pid2_kp);
   EEPROM_readAnything(pid2_eepromTuningOffset+5,pid2_ki);
   EEPROM_readAnything(pid2_eepromTuningOffset+9,pid2_kd);
+ // Serial.println(pid2_eepromTuningOffset+1);
+ // Serial.println(pid2_kp);
+ // Serial.println(pid2_eepromTuningOffset+5);
+ // Serial.println(pid2_ki);
+ // Serial.println(pid2_eepromTuningOffset+9);
+ // Serial.println(pid2_kd);
+
+  
 }
 
 void EEPROMBackupATune()
@@ -861,33 +873,33 @@ void SerialReceive()
   
   byte identifier=0;
   byte index=0;
-  byte pid1_Val=0,pid2_Val=0,val3=0;
+  byte cmd_b0=0,cmd_b1=0,cmd_b2=0;
 
   if(Serial.available())
   {
     byte identifier = Serial.read();
-    byte pid1_Val = Serial.read();
-    byte pid2_Val = Serial.read();
+    byte cmd_b0 = Serial.read();
+    byte cmd_b1 = Serial.read();
     while (Serial.available())
     {
-      byte val3 = Serial.read();
-      foo.asBytes[index] = val3;
+      byte cmd_b2 = Serial.read();
+      foo.asBytes[index] = cmd_b2;
       index++;
     }
     Serial.println("ready");
     switch(identifier)
     {
-      case 0: //Settings Recieved 
+      case 0: //Settings Received 
         ReceiveSettings();
         break;
-      case 1: //Tunings Recieved 
+      case 1: //Tunings Received 
         ReceiveTunings();
         break;
-      case 2: //autotune Recieved
+      case 2: //auto tune Received
         ReceiveAtune();
         break;
       case 3: //EEPROM reset
-        if((pid1_Val==9) && (pid2_Val==8))
+        if((cmd_b0==9) && (cmd_b1==8))
         {
           EEPROMreset(); 
         }
@@ -910,12 +922,13 @@ void SerialReceive()
 void ReceiveSettings()
 {
   pid1_setpoint=double(foo.asFloat[0]);
-  pid2_setpoint=double(foo.asFloat[1]);
-  if(pid1_Val==0)                              // * change PID1 mode to manual and set output 
+  pid2_setpoint=double(foo.asFloat[2]);
+  
+  if(cmd_b0==0)                              // * change PID1 mode to manual and set output 
   {
     myPID1.SetMode(MANUAL);
     pid1_modeIndex=0;
-    pid1_output=double(foo.asFloat[2]);
+    pid1_output=double(foo.asFloat[1]);
   }
   else 
   {
@@ -923,7 +936,7 @@ void ReceiveSettings()
     pid1_modeIndex=1;
   }
 
-  if(pid2_Val==0)                              // * change PID2 mode to manual and set output
+  if(cmd_b1==0)                              // * change PID2 mode to manual and set output
   {
     myPID2.SetMode(MANUAL);
     pid2_modeIndex=0;
@@ -940,18 +953,22 @@ void ReceiveSettings()
 void ReceiveTunings()
 {
   pid1_kp = double(foo.asFloat[0]);
-  pid2_kp = double(foo.asFloat[1]);
-  pid1_ki = double(foo.asFloat[2]);
-  pid2_ki = double(foo.asFloat[3]);
-  pid1_kd = double(foo.asFloat[4]);
+  pid1_ki = double(foo.asFloat[1]);
+  pid1_kd = double(foo.asFloat[2]);
+    
+  pid2_kp = double(foo.asFloat[3]);
+  pid2_ki = double(foo.asFloat[4]);
   pid2_kd = double(foo.asFloat[5]);
-  pid1_ctrlDirection = pid1_Val;
-  pid2_ctrlDirection = pid2_Val;
+  pid1_ctrlDirection = cmd_b0;
+  pid2_ctrlDirection = cmd_b1;
+  
   myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
   myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
-  if(pid1_Val==0) myPID1.SetControllerDirection(DIRECT);
+  
+  if(cmd_b0==0) myPID1.SetControllerDirection(DIRECT);
   else myPID1.SetControllerDirection(REVERSE);
-  if(pid2_Val==0) myPID2.SetControllerDirection(DIRECT);
+  
+  if(cmd_b1==0) myPID2.SetControllerDirection(DIRECT);
   else myPID2.SetControllerDirection(REVERSE);
   EEPROMBackupTunings();
   sendTune = true;
@@ -959,17 +976,22 @@ void ReceiveTunings()
 
 void ReceiveAtune()
 {
+	
+  // PID 001					
   pid1_aTuneStep = foo.asFloat[0];
-  pid2_aTuneStep = foo.asFloat[1];
-  pid1_aTuneNoise = foo.asFloat[2];
-  pid2_aTuneNoise = foo.asFloat[3];  
-  pid1_aTuneLookBack = (unsigned int)foo.asFloat[4];
+  pid1_aTuneNoise = foo.asFloat[1];
+  pid1_aTuneLookBack = (unsigned int)foo.asFloat[2];
+  
+  // PID 002
+  pid2_aTuneStep = foo.asFloat[3];
+  pid2_aTuneNoise = foo.asFloat[4];  
   pid2_aTuneLookBack = (unsigned int)foo.asFloat[5];
-  if((pid1_Val==0 && pid1_tuning) || (pid1_Val==1 && !pid1_tuning))
+  
+  if((cmd_b0==0 && pid1_tuning) || (cmd_b0==1 && !pid1_tuning))
   { //toggle autotune state
     pid1_changeAutoTune();
   }
-  if((pid2_Val==0 && pid2_tuning) || (pid2_Val==1 && !pid2_tuning))
+  if((cmd_b1==0 && pid2_tuning) || (cmd_b1==1 && !pid2_tuning))
   { //toggle autotune state
     pid2_changeAutoTune();
   }
@@ -979,13 +1001,13 @@ void ReceiveAtune()
 
 void pid1_ReceiveProfile()
 {
-  pid1_Val=pid1_nProfSteps;
+  cmd_b0=pid1_nProfSteps;
   pid1_receivingProfile=true;
   if(pid1_runningProfile)                          //stop the current profile execution
   {
     pid1_StopProfile();
   }
-  if(!pid1_Val)                               // store profile receive start time
+  if(!cmd_b0)                               // store profile receive start time
   {
     pid1_profReceiveStart = millis();
   }
@@ -997,7 +1019,7 @@ void pid1_ReceiveProfile()
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(pid1_Val>=pid1_nProfSteps)                      // profile receive complete
+    if(cmd_b0>=pid1_nProfSteps)                      // profile receive complete
     {
       pid1_receivingProfile=false;
       Serial.print("ProfDone ");              // acknowledge profile recieve completed
@@ -1006,17 +1028,17 @@ void pid1_ReceiveProfile()
     }
     else                                      // read in profile step values
     {
-      pid1_profVals[pid1_Val] = foo.asFloat[0];
-      pid1_profTimes[pid1_Val] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid1_profVals[cmd_b0] = foo.asFloat[0];
+      pid1_profTimes[cmd_b0] = (unsigned long)(foo.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
     byte index=0;                                 // read in next profile step bytes
-    byte pid1_Val = Serial.read();
+    byte cmd_b0 = Serial.read();
     while (Serial.available())
     {
-      byte val3 = Serial.read();
-      foo.asBytes[index] = val3;
+      byte cmd_b2 = Serial.read();
+      foo.asBytes[index] = cmd_b2;
       index++;
     }
   }
@@ -1024,7 +1046,7 @@ void pid1_ReceiveProfile()
 
 void pid2_ReceiveProfile()
 {
-  pid2_Val=pid2_nProfSteps;
+  cmd_b1=pid2_nProfSteps;
   pid2_receivingProfile=true;
   if(pid2_runningProfile)                          //stop the current profile execution
   {
@@ -1038,30 +1060,30 @@ void pid2_ReceiveProfile()
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(pid2_Val==0)                               // store profile receive start time
+    if(cmd_b1==0)                               // store profile receive start time
     {
       pid2_profReceiveStart = millis();
     }
-    if(pid2_Val>=pid2_nProfSteps)                      // profile receive complete
+    if(cmd_b1>=pid2_nProfSteps)                      // profile receive complete
     {
       pid2_receivingProfile=false;
-      Serial.print("ProfDone ");              // acknowledge profile recieve completed
+      Serial.print("ProfDone ");              // acknowledge profile receive completed
       EEPROMBackupProfile();
       Serial.println("Archived");             // acknowledge profile stored
     }
     else                                      // read in profile step values
     {
-      pid2_profVals[pid2_Val] = foo.asFloat[0];
-      pid2_profTimes[pid2_Val] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid2_profVals[cmd_b1] = foo.asFloat[0];
+      pid2_profTimes[cmd_b1] = (unsigned long)(foo.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
     byte index=0;                                 // read in next profile step bytes
-    byte pid2_Val = Serial.read();
+    byte cmd_b1 = Serial.read();
     while (Serial.available())
     {
-      byte val3 = Serial.read();
-      foo.asBytes[index] = val3;
+      byte cmd_b2 = Serial.read();
+      foo.asBytes[index] = cmd_b2;
       index++;
     }
   }
@@ -1069,10 +1091,10 @@ void pid2_ReceiveProfile()
 
 void ProfileCommand()
 {
-  if(!pid1_Val && !pid1_runningProfile) pid1_StartProfile();
-  if(pid1_Val && pid1_runningProfile) pid1_StopProfile();
-  if(!pid2_Val && !pid2_runningProfile) pid2_StartProfile();
-  if(pid2_Val && pid2_runningProfile) pid2_StopProfile();
+  if(!cmd_b0 && !pid1_runningProfile) pid1_StartProfile();
+  if(cmd_b0 && pid1_runningProfile) pid1_StopProfile();
+  if(!cmd_b1 && !pid2_runningProfile) pid2_StartProfile();
+  if(cmd_b1 && pid2_runningProfile) pid2_StopProfile();
 }
 
 
@@ -1231,7 +1253,7 @@ void SerialSend()
     Serial.print(int(pid2_curType));
     Serial.print(" ");
   
-  switch(pid1_curType)
+  switch(pid2_curType)
   {
     case 1: //ramp
       Serial.println((pid2_helperTime-now)); //time remaining
