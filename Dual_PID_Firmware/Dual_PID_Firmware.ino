@@ -82,7 +82,7 @@ bool pid1_tuning = false;
 bool pid2_tuning= false;
 
 double pid1_error, pid2_error;
-int cmd_b0, cmd_b1;
+int TTC_Packet_0_Frame_1, TTC_Packet_0_Frame_2;
 
 double pid1_setpoint=255, pid1_input=255, pid1_output=255, pid1_pidInput=255;
 double pid2_setpoint=100, pid2_input=100, pid2_output=100, pid2_pidInput=100;
@@ -212,9 +212,9 @@ void loop()
 
   if(pid1_tuning)
   {
-    byte cmd_b0 = (pid1_aTune.Runtime());
+    byte TTC_Packet_0_Frame_1 = (pid1_aTune.Runtime());
 
-    if(cmd_b0 != 0)
+    if(TTC_Packet_0_Frame_1 != 0)
     {
       pid1_tuning = false;
     }
@@ -241,9 +241,9 @@ void loop()
   
   if(pid2_tuning)
   {
-    byte cmd_b1 = (pid2_aTune.Runtime());
+    byte TTC_Packet_0_Frame_2 = (pid2_aTune.Runtime());
 
-    if(cmd_b1 != 0)
+    if(TTC_Packet_0_Frame_2 != 0)
     {
       pid2_tuning = false;
     }
@@ -853,7 +853,7 @@ union {                // This Data structure lets
   byte asBytes[32];    // us take the byte array
   float asFloat[8];    // sent from processing and
 }                      // easily convert it to a
-foo;                   // float array
+TTC_Packet_0;                   // float array
 
 // getting float values from processing into the arduino
 // was no small task.  the way this program does it is
@@ -871,23 +871,28 @@ void SerialReceive()
 
   // read the bytes sent from Processing
   
-  byte identifier=0;
-  byte index=0;
-  byte cmd_b0=0,cmd_b1=0,cmd_b2=0;
+  
+  byte TTC_Packet_0_Frame_0=0;
+  byte TTC_Packet_0_Frame_1=0;
+  byte TTC_Packet_0_Frame_2=0;  
+  byte TTC_Packet_0_Channels_0=0;
+  byte TTC_Packet_0_Channels_0_Index=0;
+  
+  
 
   if(Serial.available())
   {
-    byte identifier = Serial.read();
-    byte cmd_b0 = Serial.read();
-    byte cmd_b1 = Serial.read();
+    byte TTC_Packet_0_Frame_0 = Serial.read();
+    byte TTC_Packet_0_Frame_1 = Serial.read();
+    byte TTC_Packet_0_Frame_2 = Serial.read();
     while (Serial.available())
     {
-      byte cmd_b2 = Serial.read();
-      foo.asBytes[index] = cmd_b2;
-      index++;
+      byte TTC_Packet_0_Channels_0 = Serial.read();
+      TTC_Packet_0.asBytes[TTC_Packet_0_Channels_0_Index] = TTC_Packet_0_Channels_0;
+      TTC_Packet_0_Channels_0_Index++;
     }
     Serial.println("ready");
-    switch(identifier)
+    switch(TTC_Packet_0_Frame_0)
     {
       case 0: //Settings Received 
         ReceiveSettings();
@@ -899,7 +904,7 @@ void SerialReceive()
         ReceiveAtune();
         break;
       case 3: //EEPROM reset
-        if((cmd_b0==9) && (cmd_b1==8))
+        if((TTC_Packet_0_Frame_1==9) && (TTC_Packet_0_Frame_2==8))
         {
           EEPROMreset(); 
         }
@@ -921,26 +926,29 @@ void SerialReceive()
 
 void ReceiveSettings()
 {
-  pid1_setpoint=double(foo.asFloat[0]);
-  pid2_setpoint=double(foo.asFloat[2]);
-  
-  if(cmd_b0==0)                              // * change PID1 mode to manual and set output 
-  {
-    myPID1.SetMode(MANUAL);
-    pid1_modeIndex=0;
-    pid1_output=double(foo.asFloat[1]);
-  }
+	// PID 001	
+	pid1_setpoint=double(TTC_Packet_0.asFloat[0]);
+	
+  if(TTC_Packet_0_Frame_1==0)                              // * change PID1 mode to manual and set output 
+	{
+	myPID1.SetMode(MANUAL);
+	pid1_modeIndex=0;
+	pid1_output=double(TTC_Packet_0.asFloat[1]);
+	}
   else 
-  {
-    myPID1.SetMode(AUTOMATIC);
-    pid1_modeIndex=1;
-  }
+	{
+	myPID1.SetMode(AUTOMATIC);
+	pid1_modeIndex=1;
+	}
 
-  if(cmd_b1==0)                              // * change PID2 mode to manual and set output
+	// PID 002
+	pid2_setpoint=double(TTC_Packet_0.asFloat[2]);
+
+  if(TTC_Packet_0_Frame_2==0)                              // * change PID2 mode to manual and set output
   {
     myPID2.SetMode(MANUAL);
     pid2_modeIndex=0;
-    pid2_output=double(foo.asFloat[3]);
+    pid2_output=double(TTC_Packet_0.asFloat[3]);
   }
   else 
   {
@@ -952,24 +960,32 @@ void ReceiveSettings()
   
 void ReceiveTunings()
 {
-  pid1_kp = double(foo.asFloat[0]);
-  pid1_ki = double(foo.asFloat[1]);
-  pid1_kd = double(foo.asFloat[2]);
-    
-  pid2_kp = double(foo.asFloat[3]);
-  pid2_ki = double(foo.asFloat[4]);
-  pid2_kd = double(foo.asFloat[5]);
-  pid1_ctrlDirection = cmd_b0;
-  pid2_ctrlDirection = cmd_b1;
+  // PID 001
+  pid1_ctrlDirection = TTC_Packet_0_Frame_1;
+  if(pid1_ctrlDirection==0) 
+	myPID1.SetControllerDirection(DIRECT);
+  else
+	myPID1.SetControllerDirection(REVERSE);
+  pid1_kp = double(TTC_Packet_0.asFloat[0]);
+  pid1_ki = double(TTC_Packet_0.asFloat[1]);
+  pid1_kd = double(TTC_Packet_0.asFloat[2]);
   
   myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
+  
+  
+  
+  // PID 002 
+  pid2_ctrlDirection = TTC_Packet_0_Frame_2;
+  if(pid2_ctrlDirection==0)
+   myPID2.SetControllerDirection(DIRECT);
+  else
+   myPID2.SetControllerDirection(REVERSE);   
+  pid2_kp = double(TTC_Packet_0.asFloat[3]);
+  pid2_ki = double(TTC_Packet_0.asFloat[4]);
+  pid2_kd = double(TTC_Packet_0.asFloat[5]);
+  
   myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
   
-  if(cmd_b0==0) myPID1.SetControllerDirection(DIRECT);
-  else myPID1.SetControllerDirection(REVERSE);
-  
-  if(cmd_b1==0) myPID2.SetControllerDirection(DIRECT);
-  else myPID2.SetControllerDirection(REVERSE);
   EEPROMBackupTunings();
   sendTune = true;
 }
@@ -978,20 +994,20 @@ void ReceiveAtune()
 {
 	
   // PID 001					
-  pid1_aTuneStep = foo.asFloat[0];
-  pid1_aTuneNoise = foo.asFloat[1];
-  pid1_aTuneLookBack = (unsigned int)foo.asFloat[2];
+  pid1_aTuneStep = TTC_Packet_0.asFloat[0];
+  pid1_aTuneNoise = TTC_Packet_0.asFloat[1];
+  pid1_aTuneLookBack = (unsigned int)TTC_Packet_0.asFloat[2];
   
   // PID 002
-  pid2_aTuneStep = foo.asFloat[3];
-  pid2_aTuneNoise = foo.asFloat[4];  
-  pid2_aTuneLookBack = (unsigned int)foo.asFloat[5];
+  pid2_aTuneStep = TTC_Packet_0.asFloat[3];
+  pid2_aTuneNoise = TTC_Packet_0.asFloat[4];  
+  pid2_aTuneLookBack = (unsigned int)TTC_Packet_0.asFloat[5];
   
-  if((cmd_b0==0 && pid1_tuning) || (cmd_b0==1 && !pid1_tuning))
+  if((TTC_Packet_0_Frame_1==0 && pid1_tuning) || (TTC_Packet_0_Frame_1==1 && !pid1_tuning))
   { //toggle autotune state
     pid1_changeAutoTune();
   }
-  if((cmd_b1==0 && pid2_tuning) || (cmd_b1==1 && !pid2_tuning))
+  if((TTC_Packet_0_Frame_2==0 && pid2_tuning) || (TTC_Packet_0_Frame_2==1 && !pid2_tuning))
   { //toggle autotune state
     pid2_changeAutoTune();
   }
@@ -1001,13 +1017,15 @@ void ReceiveAtune()
 
 void pid1_ReceiveProfile()
 {
-  cmd_b0=pid1_nProfSteps;
   pid1_receivingProfile=true;
+  
+  TTC_Packet_0_Frame_1=pid1_nProfSteps;
+  
   if(pid1_runningProfile)                          //stop the current profile execution
   {
     pid1_StopProfile();
   }
-  if(!cmd_b0)                               // store profile receive start time
+  if(!TTC_Packet_0_Frame_1)                               // store profile receive start time
   {
     pid1_profReceiveStart = millis();
   }
@@ -1019,7 +1037,7 @@ void pid1_ReceiveProfile()
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(cmd_b0>=pid1_nProfSteps)                      // profile receive complete
+    if(TTC_Packet_0_Frame_1>=pid1_nProfSteps)                      // profile receive complete
     {
       pid1_receivingProfile=false;
       Serial.print("ProfDone ");              // acknowledge profile recieve completed
@@ -1028,25 +1046,25 @@ void pid1_ReceiveProfile()
     }
     else                                      // read in profile step values
     {
-      pid1_profVals[cmd_b0] = foo.asFloat[0];
-      pid1_profTimes[cmd_b0] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid1_profVals[TTC_Packet_0_Frame_1] = TTC_Packet_0.asFloat[0];
+      pid1_profTimes[TTC_Packet_0_Frame_1] = (unsigned long)(TTC_Packet_0.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
-    byte index=0;                                 // read in next profile step bytes
-    byte cmd_b0 = Serial.read();
+    byte TTC_Packet_0_Channels_0_Index=0;                                 // read in next profile step bytes
+    byte TTC_Packet_0_Frame_1 = Serial.read();
     while (Serial.available())
     {
-      byte cmd_b2 = Serial.read();
-      foo.asBytes[index] = cmd_b2;
-      index++;
+      byte TTC_Packet_0_Channels_0 = Serial.read();
+      TTC_Packet_0.asBytes[TTC_Packet_0_Channels_0_Index] = TTC_Packet_0_Channels_0;
+      TTC_Packet_0_Channels_0_Index++;
     }
   }
 }
 
 void pid2_ReceiveProfile()
 {
-  cmd_b1=pid2_nProfSteps;
+  TTC_Packet_0_Frame_2=pid2_nProfSteps;
   pid2_receivingProfile=true;
   if(pid2_runningProfile)                          //stop the current profile execution
   {
@@ -1060,11 +1078,11 @@ void pid2_ReceiveProfile()
       Serial.println("ProfError");
       EEPROMRestoreProfile();
     }
-    if(cmd_b1==0)                               // store profile receive start time
+    if(TTC_Packet_0_Frame_2==0)                               // store profile receive start time
     {
       pid2_profReceiveStart = millis();
     }
-    if(cmd_b1>=pid2_nProfSteps)                      // profile receive complete
+    if(TTC_Packet_0_Frame_2>=pid2_nProfSteps)                      // profile receive complete
     {
       pid2_receivingProfile=false;
       Serial.print("ProfDone ");              // acknowledge profile receive completed
@@ -1073,28 +1091,28 @@ void pid2_ReceiveProfile()
     }
     else                                      // read in profile step values
     {
-      pid2_profVals[cmd_b1] = foo.asFloat[0];
-      pid2_profTimes[cmd_b1] = (unsigned long)(foo.asFloat[1] * 1000);
+      pid2_profVals[TTC_Packet_0_Frame_2] = TTC_Packet_0.asFloat[0];
+      pid2_profTimes[TTC_Packet_0_Frame_2] = (unsigned long)(TTC_Packet_0.asFloat[1] * 1000);
       Serial.print("ProfAck ");              // request next profile step values
     }
     
-    byte index=0;                                 // read in next profile step bytes
-    byte cmd_b1 = Serial.read();
+    byte TTC_Packet_0_Channels_0_Index=0;                                 // read in next profile step bytes
+    byte TTC_Packet_0_Frame_2 = Serial.read();
     while (Serial.available())
     {
-      byte cmd_b2 = Serial.read();
-      foo.asBytes[index] = cmd_b2;
-      index++;
+      byte TTC_Packet_0_Channels_0 = Serial.read();
+      TTC_Packet_0.asBytes[TTC_Packet_0_Channels_0_Index] = TTC_Packet_0_Channels_0;
+      TTC_Packet_0_Channels_0_Index++;
     }
   }
 }
 
 void ProfileCommand()
 {
-  if(!cmd_b0 && !pid1_runningProfile) pid1_StartProfile();
-  if(cmd_b0 && pid1_runningProfile) pid1_StopProfile();
-  if(!cmd_b1 && !pid2_runningProfile) pid2_StartProfile();
-  if(cmd_b1 && pid2_runningProfile) pid2_StopProfile();
+  if(!TTC_Packet_0_Frame_1 && !pid1_runningProfile) pid1_StartProfile();
+  if(TTC_Packet_0_Frame_1 && pid1_runningProfile) pid1_StopProfile();
+  if(!TTC_Packet_0_Frame_2 && !pid2_runningProfile) pid2_StartProfile();
+  if(TTC_Packet_0_Frame_2 && pid2_runningProfile) pid2_StopProfile();
 }
 
 
