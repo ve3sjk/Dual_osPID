@@ -77,6 +77,7 @@ unsigned long now, tft_Time, buttonTime, ioTime, serialTime;
 boolean sendInfo=true, sendDash=true, sendTune=true, sendAtune=true;
 
 bool editing=false;
+bool debug = false;
 
 bool pid1_tuning = false;
 bool pid2_tuning= false;
@@ -150,36 +151,35 @@ void setup()
 {
   TCCR1B = (TCCR1B & 0b11111000) | 0x05;
   Serial.begin(115200);
-//  buttonTime=1;
-  ioTime=5;
-  serialTime=6;
-  tft_Time=10;
-  
-  //windowStartTime=2;
 
+  
+  
   myGLCD.InitLCD();
   myGLCD.clrScr();
   myGLCD.setColor(255, 120, 120);
   myGLCD.setBackColor(0, 0, 0);
   myGLCD.setFont(DejaVuSans18);
-  Serial.println(" Dual osPID   ");
-  Serial.println(" v1.00   ");
+  if (debug == false) Serial.println("Dual osPID   ");
+  if (debug == false)Serial.println("v1.00   ");
   myButtons.setTextFont(DejaVuSans18);
   myTouch.InitTouch();
   myTouch.setPrecision(PREC_MEDIUM);
 
 //  delay(1000);
+  ioTime=5;
+  serialTime=6;
+  tft_Time=10;
 
   initializeEEPROM();
-
   InitializeOutputCard();
   
+	// PID 001
   myPID1.SetSampleTime(1000);
   myPID1.SetOutputLimits(0, 255);
   myPID1.SetTunings(pid1_kp, pid1_ki, pid1_kd);
   myPID1.SetControllerDirection(pid1_ctrlDirection);
   myPID1.SetMode(pid1_modeIndex);
-  
+  // PID 002
   myPID2.SetSampleTime(1000);
   myPID2.SetOutputLimits(0, 255);
   myPID2.SetTunings(pid2_kp, pid2_ki, pid2_kd);
@@ -189,11 +189,11 @@ void setup()
 }
 //***************************loop start*****************
 byte editDepth=0;
+
 void loop()
 {
   now = millis();
- // Serial.println(pid1_kp);
- // Serial.println(now);
+
   bool doIO = now >= ioTime;
   //read in the input
   if(doIO)
@@ -208,7 +208,16 @@ void loop()
     pid2_pidInput = pid2_input;
   }
   
-  //Serial.println("done input/output");
+  if (debug == true)Serial.println("exit doIO");
+	if (debug == true)Serial.print("pid1_tuning = ");
+	if (debug == true)Serial.println(pid1_tuning);
+	if (debug == true)Serial.print("pid2_tuning = ");
+	if (debug == true)Serial.println(pid2_tuning);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
 
   if(pid1_tuning)
   {
@@ -237,7 +246,16 @@ void loop()
     myPID1.Compute();
   }
 
- // Serial.println("done pid1 tuning check");
+  if (debug == true)Serial.println("exit pid1_tuning");
+  if (debug == true)Serial.print("pid1_tuning = ");
+  if (debug == true)Serial.println(pid1_tuning);
+  if (debug == true)Serial.print("pid2_tuning = ");
+  if (debug == true)Serial.println(pid2_tuning);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
   
   if(pid2_tuning)
   {
@@ -265,7 +283,20 @@ void loop()
     //allow the pid to compute if necessary
     myPID2.Compute();
   }
- // Serial.println("done pid2 tuning check");
+
+  if (debug == true)Serial.println("exit pid2 tuning");
+  if (debug == true)Serial.print("pid1_tuning = ");
+  if (debug == true)Serial.println(pid1_tuning);
+  if (debug == true)Serial.print("pid2_tuning = ");
+  if (debug == true)Serial.println(pid2_tuning);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+  
+  drawTFT();
+  
   if(doIO)
   {
     //send to output card
@@ -273,15 +304,18 @@ void loop()
     pid2_WriteToOutput();
   }
   
-  //Serial.println("done send output");
-  
-  if(now>tft_Time)
-  {
-  drawTFT();
-  tft_Time+=250;
-  }
-//  Serial.println("done tft");
-//  Serial.println(serialTime);
+  if (debug == true)Serial.println("exit writetoOutput");
+  if (debug == true)Serial.print("pid1_tuning = ");
+  if (debug == true)Serial.println(pid1_tuning);
+  if (debug == true)Serial.print("pid2_tuning = ");
+  if (debug == true)Serial.println(pid2_tuning);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
+
   if(millis() > serialTime)
   {
 //    if(pid1_receivingProfile && (now-pid1_profReceiveStart)>pid1_profReceiveTimeout) pid1_receivingProfile = false;
@@ -289,14 +323,33 @@ void loop()
 //    if(pid2_receivingProfile && (now-pid2_profReceiveStart)>pid2_profReceiveTimeout) pid2_receivingProfile = false;
 //    Serial.println("pid2prof");
     SerialReceive();
-  //  Serial.println("done serial recv");
+  if (debug == true)Serial.println("exit SerialReceive");
+  if (debug == true)Serial.print("pid1_tuning = ");
+  if (debug == true)Serial.println(pid1_tuning);
+  if (debug == true)Serial.print("pid2_tuning = ");
+  if (debug == true)Serial.println(pid2_tuning);
+  if (debug == true)Serial.print("pid1_runningprofile = ");
+  if (debug == true)Serial.println(pid1_runningProfile);
+  if (debug == true)Serial.print("pid2_runningProfile = ");
+  if (debug == true)Serial.println(pid2_runningProfile);
+  if (debug == true)Serial.println();
+
     SerialSend();
-   // Serial.println("done serial send");
+
+  if (debug == true)Serial.println("exit SerialSend");
+  if (debug == true)Serial.print("pid1_tuning = ");
+  if (debug == true)Serial.println(pid1_tuning);
+  if (debug == true)Serial.print("pid2_tuning = ");
+  if (debug == true)Serial.println(pid2_tuning);
+  if (debug == true)Serial.print("pid1_runningprofile = ");
+  if (debug == true)Serial.println(pid1_runningProfile);
+  if (debug == true)Serial.print("pid2_runningProfile = ");
+  if (debug == true)Serial.println(pid2_runningProfile);
+  if (debug == true)Serial.println();
+
     serialTime += 500;
   }
 }
-//**********************************************end loop
-//******************************************************
 
 void drawTFT()
 {
@@ -406,10 +459,10 @@ void pid2_changeAutoTune()
   }
 }
 
-void pid1_AutoTuneHelper(boolean start)
+void pid1_AutoTuneHelper(boolean pid1_start)
 {
 
-  if(start)
+  if(pid1_start)
   {
     pid1_ATuneModeRember = myPID1.GetMode();
     myPID1.SetMode(MANUAL);
@@ -421,10 +474,10 @@ void pid1_AutoTuneHelper(boolean start)
   } 
 }
 
-void pid2_AutoTuneHelper(boolean start)
+void pid2_AutoTuneHelper(boolean pid2_start)
 {
 
-  if(start)
+  if(pid2_start)
   {
     pid2_ATuneModeRember = myPID2.GetMode();
     myPID2.SetMode(MANUAL);
@@ -892,6 +945,7 @@ void SerialReceive()
       TTC_Packet_0_Channels_0_Index++;
     }
     Serial.println("ready");
+	
     switch(TTC_Packet_0_Frame_0)
     {
       case 0: //Settings Received 
@@ -1040,7 +1094,7 @@ void pid1_ReceiveProfile()
     if(TTC_Packet_0_Frame_1>=pid1_nProfSteps)                      // profile receive complete
     {
       pid1_receivingProfile=false;
-      Serial.print("ProfDone ");              // acknowledge profile recieve completed
+      Serial.print("ProfDone ");              // acknowledge profile receive completed
       EEPROMBackupProfile();
       Serial.println("Archived");             // acknowledge profile stored
     }
@@ -1048,7 +1102,7 @@ void pid1_ReceiveProfile()
     {
       pid1_profVals[TTC_Packet_0_Frame_1] = TTC_Packet_0.asFloat[0];
       pid1_profTimes[TTC_Packet_0_Frame_1] = (unsigned long)(TTC_Packet_0.asFloat[1] * 1000);
-      Serial.print("ProfAck ");              // request next profile step values
+      Serial.print("pid1_ProfAck ");              // request next profile step values
     }
     
     byte TTC_Packet_0_Channels_0_Index=0;                                 // read in next profile step bytes
@@ -1125,10 +1179,27 @@ void SerialSend()
 {
   if(sendInfo)
   {//just send out the stock identifier
-    Serial.print("\nDual osPID v1.0");
-    Serial.println("");
+    Serial.print("Dual osPID");
+    Serial.println(" ");
     sendInfo = false; //only need to send this info once per request
   }
+	if (debug == true)Serial.println();
+  if (debug == true)Serial.println("exit sendinfo");
+  if (debug == true)Serial.print("sendinfo = ");
+  if (debug == true)Serial.println(sendInfo);
+  if (debug == true)Serial.print("sendDash = ");
+  if (debug == true)Serial.println(sendDash);
+	if (debug == true)Serial.print("sendtune = ");
+	if (debug == true)Serial.println(sendTune);
+	if (debug == true)Serial.print("send atune = ");
+	if (debug == true)Serial.println(sendAtune);
+  if (debug == true)Serial.print("pid1_runningprofile = ");
+  if (debug == true)Serial.println(pid1_runningProfile);
+  if (debug == true)Serial.print("pid2_runningProfile = ");
+  if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
+
   if(sendDash)
   {
     // Header
@@ -1177,8 +1248,25 @@ void SerialSend()
     //*************************************
     Serial.println(ackDash?1:0);    // 15
    // Serial.print(" ");
-    if(sendDash)sendDash=false;
+    if(sendDash)sendDash=true;
   }
+	if (debug == true)Serial.println();
+	if (debug == true)Serial.println("exit senddash");
+	if (debug == true)Serial.print("sendinfo = ");
+	if (debug == true)Serial.println(sendInfo);
+	if (debug == true)Serial.print("sendDash = ");
+	if (debug == true)Serial.println(sendDash);
+	if (debug == true)Serial.print("sendtune = ");
+	if (debug == true)Serial.println(sendTune);
+	if (debug == true)Serial.print("send atune = ");
+	if (debug == true)Serial.println(sendAtune);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
+
   if(sendTune)
   {
     // header
@@ -1210,9 +1298,26 @@ void SerialSend()
     Serial.print(" ");
     Serial.print(pid2_tuning?1:0); // 10
     Serial.print(" ");
-           
-    if(sendTune)sendTune=false;
+
+    if(sendTune)sendTune=true;
   }
+	if (debug == true)Serial.println();
+	if (debug == true)Serial.println();
+	if (debug == true)Serial.println("exit sendtune");
+	if (debug == true)Serial.print("sendinfo = ");
+	if (debug == true)Serial.println(sendInfo);
+	if (debug == true)Serial.print("sendDash = ");
+	if (debug == true)Serial.println(sendDash);
+	if (debug == true)Serial.print("sendtune = ");
+	if (debug == true)Serial.println(sendTune);
+	if (debug == true)Serial.print("send atune = ");
+	if (debug == true)Serial.println(sendAtune);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
   if(sendAtune)
   {
     // PID 001
@@ -1236,11 +1341,28 @@ void SerialSend()
     // ACK
     //*************************************
     Serial.println(ackTune?1:0); // 17
-    if(sendAtune)sendAtune=false;
+    if(sendAtune)sendAtune=true;
   }
+	if (debug == true)Serial.println();
+	if (debug == true)Serial.println("exit sendatune");
+	if (debug == true)Serial.print("sendinfo = ");
+	if (debug == true)Serial.println(sendInfo);
+	if (debug == true)Serial.print("sendDash = ");
+	if (debug == true)Serial.println(sendDash);
+	if (debug == true)Serial.print("sendtune = ");
+	if (debug == true)Serial.println(sendTune);
+	if (debug == true)Serial.print("send atune = ");
+	if (debug == true)Serial.println(sendAtune);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
+
   if(pid1_runningProfile)
   {
-    Serial.print("PID1PROF ");
+    Serial.print("pid1_PROF ");
     Serial.print(int(pid1_curProfStep));
     Serial.print(" ");
     Serial.print(int(pid1_curType));
@@ -1262,10 +1384,27 @@ void SerialSend()
     default: 
       break;
   }
-  }  
+  }
+
+	if (debug == true)Serial.println("exit running profile 1");
+	if (debug == true)Serial.print("sendinfo = ");
+	if (debug == true)Serial.println(sendInfo);
+	if (debug == true)Serial.print("sendDash = ");
+	if (debug == true)Serial.println(sendDash);
+	if (debug == true)Serial.print("sendtune = ");
+	if (debug == true)Serial.println(sendTune);
+	if (debug == true)Serial.print("send atune = ");
+	if (debug == true)Serial.println(sendAtune);
+	if (debug == true)Serial.print("pid1_runningprofile = ");
+	if (debug == true)Serial.println(pid1_runningProfile);
+	if (debug == true)Serial.print("pid2_runningProfile = ");
+	if (debug == true)Serial.println(pid2_runningProfile);
+	if (debug == true)Serial.println();
+
+  
   if(pid2_runningProfile)
   {
-    Serial.print("PID2PROF ");
+    Serial.print("pid1_PROF ");
     Serial.print(int(pid2_curProfStep));
     Serial.print(" ");
     Serial.print(int(pid2_curType));
@@ -1285,13 +1424,10 @@ void SerialSend()
       Serial.println(pid2_curTime-(now-pid2_helperTime));
       break;
     default: 
-      break;    
-      
+      break;        
   }
+	}
 }
-}
-
-
 
 
 
